@@ -48,6 +48,7 @@ const base = {
   pearlPending: false,
   seasonEnd: data.season.end,
   nowOverride: NOW,
+  weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { skip: false }])),
   season: Object.fromEntries(SEASON.map(m => [m.id, { status: 'none' }])),
 };
 const allPlan = Object.fromEntries(SEASON.map(m => [m.id, { status: 'plan' }]));
@@ -123,12 +124,24 @@ section('target and purchase');
 const short = compute({ ...base, level: 1, exp: 0, target: 50, nowOverride: '2026-12-10T12:00' });
 ok('deficit exists', short.deficit > 0, `deficit=${short.deficit}`);
 eq('deficit matches target', short.deficit, 49000 - short.total);
-ok('buy levels cover the deficit', short.buyLevels * 1000 >= short.deficit || short.projectedLevel + short.buyLevels === 50, `${short.buyLevels} Lv`);
-eq('buy cost is 150 gems per level', short.buyCost, short.buyLevels * 150);
 const reachedTarget = compute({ ...base, target: 2, level: 3 });
 eq('reached target has no deficit', reachedTarget.deficit, 0);
-eq('reached target needs no purchase', reachedTarget.buyLevels, 0);
 ok('reached date set', reachedTarget.reached !== null, String(reachedTarget.reached));
+
+section('weekly skip');
+const weeklyNeeded = 10000 - dailyTotal * 7;
+eq('needed from weeklies', d0.weeklyNeeded, weeklyNeeded);
+eq('whole pool leaves room to skip', d0.skipBudget, weeklyTotal - weeklyNeeded);
+const noWeeklies = Object.fromEntries(WEEKLY.map(m => [m.id, { skip: true }]));
+const skippedAll = compute({ ...base, weekly: noWeeklies });
+eq('skipping all removes the weekly exp', skippedAll.weeklyPool, 0);
+eq('skipping all caps a full week at dailies', skippedAll.weeks[1].applied, dailyTotal * 7);
+eq('skipping all goes negative', skippedAll.skipBudget, -weeklyNeeded);
+const cheap = WEEKLY.filter(m => m.exp <= 450).slice(0, 1)[0];
+const oneSkip = compute({ ...base, weekly: { ...base.weekly, [cheap.id]: { skip: true } } });
+eq('one skip lowers the budget', oneSkip.skipBudget, weeklyTotal - cheap.exp - weeklyNeeded);
+ok('one skip is affordable', oneSkip.skipBudget >= 0, String(oneSkip.skipBudget));
+ok('one skip does not lower a full week', oneSkip.weeks[1].applied === 10000);
 
 section('past season');
 const past = compute({ ...base, seasonEnd: '2026-11-09T04:59' });

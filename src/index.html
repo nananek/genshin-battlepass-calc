@@ -33,7 +33,7 @@
           <b>Lv</b>
         </label>
         <label class="in" for="exp">
-          <span>このレベルの経験値</span>
+          <span>紀行経験</span>
           <input id="exp" type="number" inputmode="numeric" min="0" max="999" step="1" data-bind="exp">
           <b>/ 1,000</b>
         </label>
@@ -43,6 +43,10 @@
           <b>/ 10,000</b>
         </label>
       </div>
+      <label class="check">
+        <input type="checkbox" data-bind="todayDone">
+        <span>今日のデイリーを消化済み</span>
+      </label>
     </div>
     <details>
       <summary>設定</summary>
@@ -67,10 +71,6 @@
           <input type="checkbox" data-bind="pearlPending">
           <span>真珠の歌のLv+10を受け取っていない</span>
         </label>
-        <label class="check">
-          <input type="checkbox" data-bind="todayDone">
-          <span>今日のデイリーを消化済み</span>
-        </label>
         <div class="field">
           <label for="seasonEnd">シーズン終了日時</label>
           <input class="text-input" id="seasonEnd" type="datetime-local" data-bind="seasonEnd">
@@ -88,6 +88,27 @@
       <h2 id="resultTitle">このままの見込み</h2>
     </div>
     <div id="resultPanel"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="weeklyTitle">
+    <div class="panel-head">
+      <h2 id="weeklyTitle">ウィークリー</h2>
+    </div>
+    <div class="panel-body">
+      <p class="budget" id="weeklyBudget"></p>
+      <div class="table-wrap">
+        <table class="responsive">
+          <thead>
+            <tr>
+              <th>任務</th>
+              <th class="exp">紀行経験</th>
+              <th>抜く</th>
+            </tr>
+          </thead>
+          <tbody id="weeklyRows"></tbody>
+        </table>
+      </div>
+    </div>
   </section>
 
   <section class="panel" aria-labelledby="seasonTitle">
@@ -139,10 +160,9 @@
       <ul>
         <li>紀行経験1,000でLv+1。Lv50が上限。</li>
         <li>デイリー4件（1日695 EXP）を毎日やる前提。</li>
-        <li>ウィークリーは冒険ランクで受けられる任務を毎週すべてやる前提。デイリーと合わせて週10,000 EXPまで加算され、超えた分は加算されない。</li>
+        <li>ウィークリーは「抜く」を付けた任務以外を毎週やる前提。デイリーと合わせて週10,000 EXPまで加算され、超えた分は加算されない。</li>
         <li>シーズン任務は週上限の対象外。期限を過ぎた任務は加算しない。</li>
         <li>真珠の歌の「Lv+10」は10,000 EXPとして扱う。</li>
-        <li>Lv購入は原石150でLv+1。Lv50を超えては買えない。</li>
       </ul>
       <ul>
         <li>データは<a href="https://wikiwiki.jp/genshinwiki/%E7%B4%80%E8%A1%8C" target="_blank" rel="noopener">原神Wiki「紀行」</a>（{{SOURCE_UPDATED}}更新）を基準にした。ウィークリーの合計は6,795 EXP。</li>

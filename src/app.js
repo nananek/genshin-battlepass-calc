@@ -19,7 +19,7 @@
   const WD = ['日', '月', '火', '水', '木', '金', '土'];
   const DAILY_EXP = DAILY.reduce((s, m) => s + m.exp, 0);
 
-  // 入力は紀行画面から拾える数字だけ。デイリーとウィークリーは「毎日・毎週すべて」を前提にする。
+  // 入力は紀行画面から拾える数字だけ。デイリーは毎日、ウィークリーは選んだものを毎週やる前提。
   const DEFAULT_STATE = {
     target: 50,
     level: 1,
@@ -31,7 +31,8 @@
     pearlPending: false,
     seasonEnd: SEASON_META.end,
     nowOverride: '',
-    season: Object.fromEntries(SEASON.map(m => [m.id, { status: 'plan' }])),
+    weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { skip: false }])),
+    season: Object.fromEntries(SEASON.map(m => [m.id, { status: 'none' }])),
   };
 
   // ---------- date helpers (JST, 05:00 reset) ----------
@@ -98,6 +99,8 @@
     const targetTotal = (state.target - 1) * LEVEL_EXP;
     const pearlBonus = state.tier === 'shinju' && state.pearlPending ? 10000 : 0;
     const arMax = WEEKLY.reduce((s, m) => s + (m.ar <= state.ar ? m.exp : 0), 0);
+    const weeklyPool = WEEKLY.reduce(
+      (s, m) => s + (m.ar <= state.ar && !state.weekly[m.id]?.skip ? m.exp : 0), 0);
     let total = (state.level - 1) * LEVEL_EXP + state.exp + pearlBonus;
 
     const missions = missionsOf(state);
@@ -127,7 +130,7 @@
       const isCurrent = ws === weekStart(nowMs);
       const days = usableDays(ws, nowMs, endMs, state.todayDone);
       const rawDaily = DAILY_EXP * days.length;
-      const rawWeekly = days.length ? arMax : 0;
+      const rawWeekly = days.length ? weeklyPool : 0;
       const startUsed = isCurrent ? Math.min(WEEK_CAP, Math.max(0, state.weekEarned)) : 0;
       const room = Math.max(0, WEEK_CAP - startUsed);
       const raw = rawDaily + rawWeekly;
@@ -176,19 +179,18 @@
     const plannedSeasonExp = planned.reduce((s, m) => s + m.exp, 0);
     const projectedLevel = Math.min(MAX_LEVEL, Math.floor(total / LEVEL_EXP) + 1);
     const deficit = Math.max(0, targetTotal - total);
-    let buyLevels = deficit > 0 ? Math.ceil(deficit / LEVEL_EXP) : 0;
-    buyLevels = Math.min(buyLevels, Math.max(0, MAX_LEVEL - projectedLevel));
 
-    const weeklyFull = Math.min(WEEK_CAP, DAILY_EXP * 7 + arMax);
+    const weeklyFull = Math.min(WEEK_CAP, DAILY_EXP * 7 + weeklyPool);
+    const weeklyNeeded = Math.max(0, WEEK_CAP - DAILY_EXP * 7);
 
     return {
-      nowMs, endMs, targetTotal, pearlBonus, arMax, dailyExp: DAILY_EXP,
+      nowMs, endMs, targetTotal, pearlBonus, arMax, weeklyPool, weeklyNeeded, dailyExp: DAILY_EXP,
       total, totalNoSeason: total - plannedSeasonExp, projectedLevel,
       weeks, reached, totalOverflow,
       missions, planned, plannedSeasonExp, expired,
-      deficit, buyLevels, buyCost: buyLevels * 150,
-      buyOverage: Math.max(0, buyLevels * LEVEL_EXP - deficit),
-      weeklyFull, weeklyShort: Math.max(0, WEEK_CAP - (DAILY_EXP * 7 + arMax)),
+      deficit,
+      weeklyFull, weeklyShort: Math.max(0, WEEK_CAP - (DAILY_EXP * 7 + weeklyPool)),
+      skipBudget: weeklyPool - Math.max(0, WEEK_CAP - DAILY_EXP * 7),
       currentWeek: weeks[0] || null,
     };
   }
@@ -208,7 +210,13 @@
     if (!saved || typeof saved !== 'object') return out;
     for (const k of Object.keys(def)) {
       if (saved[k] === undefined) continue;
-      if (k === 'season') {
+      if (k === 'weekly') {
+        if (saved.weekly && typeof saved.weekly === 'object') {
+          for (const id of Object.keys(def.weekly)) {
+            if (typeof saved.weekly[id]?.skip === 'boolean') out.weekly[id] = { skip: saved.weekly[id].skip };
+          }
+        }
+      } else if (k === 'season') {
         if (saved.season && typeof saved.season === 'object') {
           for (const id of Object.keys(def.season)) {
             const st = saved.season[id]?.status;
@@ -245,6 +253,7 @@
     const d = compute(state);
     renderCountdown(d);
     renderResult(d);
+    renderWeekly(d);
     renderSeason(d);
     renderTimeline(d);
     $('#pearlRow').hidden = state.tier !== 'shinju';
@@ -269,11 +278,10 @@
       ? 'シーズン内には届かない'
       : d.reached <= d.nowMs ? 'すでに到達している' : `${fmtDateW(d.reached)}に到達`;
     const noSeasonLevel = Math.min(MAX_LEVEL, Math.floor(d.totalNoSeason / LEVEL_EXP) + 1);
-    const buyText = d.buyLevels > 0 ? `${d.buyLevels} Lv（原石 ${num(d.buyCost)}）` : '不要';
 
     const notes = [];
     if (d.weeklyShort > 0) {
-      notes.push(`<p class="note gold">AR${state.ar} ではウィークリーが ${num(d.arMax)} EXP まで。デイリー7日分と合わせても週上限には ${num(d.weeklyShort)} EXP 届かない。</p>`);
+      notes.push(`<p class="note gold">ウィークリーの選択では週 ${num(d.weeklyPool)} EXP まで。デイリー7日分と合わせても週上限には ${num(d.weeklyShort)} EXP 足りない。</p>`);
     }
     if (d.expired.length > 0) {
       notes.push(`<p class="note red">期限切れの任務が${d.expired.length}件ある。見込みには加えていない。</p>`);
@@ -287,12 +295,32 @@
       <div class="kv">
         <div class="k">目標まで</div>
         <div class="v ${ok ? 'good' : 'bad'}">${ok ? '到達済み' : `${num(d.deficit)} EXP`}</div>
-        <div class="k">シーズン任務なしなら</div>
+        <div class="k">シーズン任務を除くと</div>
         <div class="v">Lv ${noSeasonLevel}</div>
-        <div class="k">Lv購入</div>
-        <div class="v ${d.buyLevels > 0 ? 'warn' : 'good'}">${buyText}</div>
       </div>
       ${notes.length ? `<div class="notes">${notes.join('')}</div>` : ''}`;
+  }
+
+  function renderWeekly(d) {
+    $('#weeklyRows').innerHTML = WEEKLY.map(m => {
+      const skip = !!state.weekly[m.id]?.skip;
+      const locked = m.ar > state.ar;
+      const badge = m.ar > 20 ? `<span class="badge ar">AR${m.ar}〜</span>` : '';
+      return `<tr class="${skip || locked ? 'off' : ''}">
+        <td data-label="任務"><span class="m-name">${esc(m.name)}</span> ${badge}</td>
+        <td class="exp" data-label="紀行経験">${num(m.exp)}</td>
+        <td data-label="抜く">
+          <label class="chk"><input type="checkbox" data-skip="${m.id}" ${skip ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>抜く</span></label>
+        </td>
+      </tr>`;
+    }).join('');
+
+    const ok = d.skipBudget >= 0;
+    $('#weeklyBudget').className = 'budget ' + (ok ? 'ok' : 'bad');
+    const basis = `<span>必要 ${num(d.weeklyNeeded)} ／ 全部 ${num(d.arMax)}</span>`;
+    $('#weeklyBudget').innerHTML = ok
+      ? `あと <b>${num(d.skipBudget)}</b> EXP まで抜ける${basis}`
+      : `<b>${num(-d.skipBudget)}</b> EXP 足りない${basis}`;
   }
 
   function renderSeason(d) {
@@ -386,6 +414,14 @@
       save();
       render();
     }
+  });
+
+  document.addEventListener('input', (e) => {
+    const id = e.target.dataset?.skip;
+    if (!id) return;
+    state.weekly[id] = { skip: e.target.checked };
+    save();
+    render();
   });
 
   document.addEventListener('click', (e) => {
