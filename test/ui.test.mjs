@@ -270,7 +270,7 @@ ok('prompt asks for a weekly plan', prompt.includes('週ごとの目安'), 'ask'
 ok('three destinations appear', $('#aiTargets').hidden === false && all('.ai-target').length === 3, String(all('.ai-target').length));
 ok('chatgpt link carries the prompt', ($('#aiChatgpt').getAttribute('href') || '').startsWith('https://chatgpt.com/?q='));
 ok('claude link carries the prompt', ($('#aiClaude').getAttribute('href') || '').startsWith('https://claude.ai/new?q='));
-ok('gemini link opens the app', ($('#aiGemini').getAttribute('href') || '').startsWith('https://gemini.google.com/app'));
+ok('gemini link also carries the prompt', ($('#aiGemini').getAttribute('href') || '').startsWith('https://gemini.google.com/app?q='), ($('#aiGemini').getAttribute('href') || '').slice(0, 40));
 ok('prompt is kept for copying', $('#aiPrompt').value.length > 200, String($('#aiPrompt').value.length));
 
 console.log('\n# persistence');

@@ -472,7 +472,8 @@
     const targets = [
       ['#aiChatgpt', 'https://chatgpt.com/?q=' + enc],
       ['#aiClaude', 'https://claude.ai/new?q=' + enc],
-      ['#aiGemini', 'https://gemini.google.com/app'], // GeminiはURLで文面を渡せないのでコピーを使う
+      // Gemini は ?q= が公式に保証されていない。効けば入るし、効かなければコピーした文を貼る。
+      ['#aiGemini', 'https://gemini.google.com/app?q=' + enc],
     ];
     for (const [sel, href] of targets) {
       const a = $(sel);
