@@ -90,7 +90,8 @@
     }));
   }
 
-  function compute(state) {
+  function simulate(state, pools) {
+    const { thisWeekPool, nextWeekPool, arMax, doneThisWeek } = pools;
     let nowMs = state.nowOverride ? parseJst(state.nowOverride) : Date.now();
     if (!Number.isFinite(nowMs)) nowMs = Date.now();
     let endMs = parseJst(state.seasonEnd);
@@ -98,12 +99,6 @@
 
     const targetTotal = (state.target - 1) * LEVEL_EXP;
     const pearlBonus = state.tier === 'shinju' && state.pearlPending ? 10000 : 0;
-    const wOf = (id) => state.weekly[id] || {};
-    const sumW = (pred) => WEEKLY.reduce((s, m) => s + (m.ar <= state.ar && pred(m) ? m.exp : 0), 0);
-    const arMax = sumW(() => true);
-    const thisWeekPool = sumW(m => wOf(m.id).thisWeek === 'plan');
-    const nextWeekPool = sumW(m => wOf(m.id).future === true);
-    const doneThisWeek = sumW(m => wOf(m.id).thisWeek === 'done');
     let total = (state.level - 1) * LEVEL_EXP + state.exp + pearlBonus;
 
     const missions = missionsOf(state);
@@ -203,6 +198,36 @@
     };
   }
 
+  // 抜ける量は「上限を埋められるか」ではなく「目標に届くか」で測る。
+  function compute(state) {
+    const wOf = (id) => state.weekly[id] || {};
+    const sumW = (pred) => WEEKLY.reduce((s, m) => s + (m.ar <= state.ar && pred(m) ? m.exp : 0), 0);
+    const pools = {
+      arMax: sumW(() => true),
+      thisWeekPool: sumW(m => wOf(m.id).thisWeek === 'plan'),
+      nextWeekPool: sumW(m => wOf(m.id).future === true),
+      doneThisWeek: sumW(m => wOf(m.id).thisWeek === 'done'),
+    };
+    const base = simulate(state, pools);
+    const met = base.total >= base.targetTotal;
+
+    // 抜いても目標に届く最大の EXP。上限を埋められるかではなく、目標で測る。
+    const maxDrop = (key) => {
+      if (simulate(state, { ...pools, [key]: 0 }).total >= base.targetTotal) return Infinity;
+      let lo = 0;
+      let hi = pools[key];
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        if (simulate(state, { ...pools, [key]: pools[key] - mid }).total >= base.targetTotal) lo = mid;
+        else hi = mid - 1;
+      }
+      return lo;
+    };
+    const goalBudget = met ? maxDrop('nextWeekPool') : null;
+    const goalBudgetThis = met ? maxDrop('thisWeekPool') : 0;
+    return { ...base, pools, goalBudget, goalBudgetThis };
+  }
+
   // ---------- state ----------
   function loadState() {
     try {
@@ -267,7 +292,7 @@
     renderResult(d);
     renderWeekly(d);
     renderSeason(d);
-    renderTimeline(d);
+    renderChart(d);
     $('#pearlRow').hidden = state.tier !== 'shinju';
   }
 
@@ -333,19 +358,25 @@
       </tr>`;
     }).join('');
 
-    const line = (label, budget, basis) => {
-      const ok = budget >= 0;
-      return `<p class="budget ${ok ? 'ok' : 'bad'}">${label}あと <b>${num(budget)}</b> EXP まで抜ける<span>${basis}</span></p>`;
-    };
-    const short = (label, budget, basis) =>
-      `<p class="budget bad">${label} <b>${num(-budget)}</b> EXP 足りない<span>${basis}</span></p>`;
+    const basisThis = `残り枠 ${num(d.weekRoom)} ／ 残りデイリー ${num(d.currentWeek ? d.currentWeek.rawDaily : 0)} ／ 今週やる ${num(d.thisWeekPool)}`;
+    const basisNext = `必要 ${num(d.weeklyNeeded)} ／ 毎週残す ${num(d.nextWeekPool)} ／ 全部 ${num(d.arMax)}`;
 
-    const thisBasis = `残り枠 ${num(d.weekRoom)} ／ 残りデイリー ${num(d.currentWeek ? d.currentWeek.rawDaily : 0)} ／ 今週やる ${num(d.thisWeekPool)}`;
-    const nextBasis = `必要 ${num(d.weeklyNeeded)} ／ 毎週残す ${num(d.nextWeekPool)} ／ 全部 ${num(d.arMax)}`;
+    const skipText = (label, budget) =>
+      !Number.isFinite(budget)
+        ? `${label}は全部抜いても目標に届く`
+        : budget > 0
+          ? `${label}は あと <b>${num(budget)}</b> EXP まで抜ける`
+          : `${label}は1件も抜けない`;
 
-    $('#weeklyBudget').innerHTML =
-      (d.thisWeekBudget >= 0 ? line('今週は', d.thisWeekBudget, thisBasis) : short('今週は', d.thisWeekBudget, thisBasis)) +
-      (d.nextWeekBudget >= 0 ? line('来週以降は', d.nextWeekBudget, nextBasis) : short('来週以降は', d.nextWeekBudget, nextBasis));
+    const thisHtml = `<p class="budget ${Number.isFinite(d.goalBudgetThis) && d.goalBudgetThis === 0 ? 'gold' : 'ok'}">${skipText('今週', d.goalBudgetThis)}<span>${basisThis}</span></p>`;
+    let nextHtml;
+    if (d.goalBudget === null) {
+      nextHtml = `<p class="budget bad">目標まで <b>${num(d.deficit)}</b> EXP 足りない<span>${basisNext}</span></p>`;
+    } else {
+      nextHtml = `<p class="budget ${Number.isFinite(d.goalBudget) && d.goalBudget === 0 ? 'gold' : 'ok'}">${skipText('来週以降', d.goalBudget)}<span>${basisNext}</span></p>`;
+    }
+
+    $('#weeklyBudget').innerHTML = thisHtml + nextHtml;
   }
 
   function renderSeason(d) {
@@ -379,20 +410,46 @@
     $('#seasonTotals').textContent = `やる${d.planned.length}件 ${num(d.plannedSeasonExp)} EXP／済${done.length}件`;
   }
 
-  function renderTimeline(d) {
-    $('#timelineRows').innerHTML = d.weeks.map(w => {
-      const period = `${fmtDate(w.ws)}〜${fmtDate(w.ws + 6 * DAY)}`;
-      return `<tr class="${w.isCurrent ? 'now-row' : ''}">
-        <td>${period}（${w.days}日）${w.isCurrent ? ' <span class="badge">今週</span>' : ''}</td>
-        <td class="num">${num(w.rawDaily)}</td>
-        <td class="num">${num(w.rawWeekly)}</td>
-        <td class="num">${num(w.seasonExp)}</td>
-        <td class="num">${num(w.gain)}${w.overflow > 0 ? `<div class="waste">上限 −${num(w.overflow)}</div>` : ''}</td>
-        <td class="num">${num(w.total)}</td>
-        <td class="num lv">${w.level}</td>
-      </tr>`;
+  function renderChart(d) {
+    const W = 640, H = 220;
+    const L = 58, R = 24, T = 30, B = 30;
+    const rawMax = Math.max((MAX_LEVEL - 1) * LEVEL_EXP, d.total, d.targetTotal);
+    const maxExp = Math.ceil(rawMax / 10000) * 10000;
+    const startTotal = (state.level - 1) * LEVEL_EXP + state.exp + d.pearlBonus;
+    const pts = [{ at: null, total: startTotal, level: Math.min(MAX_LEVEL, Math.floor(startTotal / LEVEL_EXP) + 1) }]
+      .concat(d.weeks.map(w => ({ at: w.ws + 6 * DAY, total: w.total, level: w.level })));
+
+    const n = pts.length;
+    const X = (i) => L + (n <= 1 ? 0 : (i / (n - 1)) * (W - L - R));
+    const Y = (v) => T + (1 - Math.min(Math.max(v, 0), maxExp) / maxExp) * (H - T - B);
+
+    const line = pts.map((p, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(p.total).toFixed(1)}`).join(' ');
+    const area = `${line} L${X(n - 1).toFixed(1)},${H - B} L${X(0).toFixed(1)},${H - B} Z`;
+
+    const grid = [0, maxExp / 2, maxExp].map(v =>
+      `<line class="grid" x1="${L}" x2="${W - R}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"></line>
+       <text class="tick" x="${L - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${num(v)}</text>`).join('');
+
+    const step = n > 7 ? 2 : 1;
+    const ticks = pts.map((p, i) => {
+      if (i % step !== 0 && i !== n - 1) return '';
+      const label = p.at === null ? 'いま' : fmtDate(p.at);
+      return `<text class="tick" x="${X(i).toFixed(1)}" y="${H - 10}" text-anchor="middle">${label}</text>`;
     }).join('');
-    $('#timelineHint').textContent = `全${d.weeks.length}週／週${num(d.weeklyFull)} EXP まで`;
+
+    const dots = pts.map((p, i) =>
+      `<circle class="dot${p.at === null ? ' start' : ''}" cx="${X(i).toFixed(1)}" cy="${Y(p.total).toFixed(1)}" r="${i === n - 1 ? 5 : 4}"></circle>
+       <text class="lv" x="${X(i).toFixed(1)}" y="${(Y(p.total) - 10).toFixed(1)}" text-anchor="middle">${p.level}</text>`).join('');
+
+    const targetY = Y(d.targetTotal);
+    const target = `
+      <line class="target" x1="${L}" x2="${W - R}" y1="${targetY.toFixed(1)}" y2="${targetY.toFixed(1)}"></line>
+      <text class="target-label" x="${W - R}" y="${(targetY - 6).toFixed(1)}" text-anchor="end">目標 Lv${state.target}</text>`;
+
+    $('#chart').innerHTML = `${grid}<path class="area" d="${area}"></path><path class="plot" d="${line}"></path>${target}${dots}${ticks}`;
+    $('#chart').setAttribute('aria-label',
+      `累計EXPの推移。いま ${num(startTotal)}、シーズン終了時 ${num(d.total)}、目標 ${num(d.targetTotal)}`);
+    $('#chartHint').textContent = `全${d.weeks.length}週／週 ${num(d.weeklyFull)} EXP まで`;
   }
 
   function bindInputs() {

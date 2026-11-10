@@ -99,39 +99,48 @@ ok('lowering level restores it', heroLevel() === lv12, String(heroLevel()));
 console.log('\n# weekly: this week and next weeks');
 const budgetNow = budget();
 ok('two budget lines', budgetNow.length === 2, JSON.stringify(budgetNow));
-ok('this week line shows the room to skip', budgetNow[0].includes('今週は') && budgetNow[0].includes('まで抜ける'), budgetNow[0]);
-ok('next weeks line shows 1,660', budgetNow[1].includes('来週以降は') && budgetNow[1].includes('1,660'), budgetNow[1]);
+ok('goal missed shows the deficit', budgetNow[1].includes('足りない'), budgetNow[1]);
+
+// 目標に届く条件にすると、抜ける量が目標基準で出る
+setInput('#nowOverride', '2026-11-10T19:27');
+ok('goal met shows the room to skip', budget()[1].includes('まで抜ける') && !budget()[1].includes('足りない'), budget()[1]);
 ok('all twelve weeklies listed', all('#weeklyRows tr').length === 12, String(all('#weeklyRows tr').length));
 ok('both columns exist', all('#weeklyRows tr')[0].querySelector('.seg') !== null && all('#weeklyRows tr')[0].querySelector('input[data-future]') !== null);
 
 const cheap = all('#weeklyRows tr').find(tr => tr.querySelector('td.exp').textContent.trim() === '450');
 const cheapId = cheap.querySelector('button[data-w]').dataset.w;
-const thisBefore = budget()[0];
-wseg(cheapId, 'none').click();
-ok('今週やらない lowers the this-week room', budget()[0] !== thisBefore && budget()[0].includes('まで抜ける') || budget()[0].includes('足りない'), budget()[0]);
-const thisAfter = budget()[0];
 
 futureBox(cheapId).checked = false;
 fire(futureBox(cheapId), 'input');
-ok('来週以降を外すと来週以降が減る', budget()[1].includes('1,210'), budget()[1]);
-ok('今週の表示は変わらない', budget()[0] === thisAfter, budget()[0]);
-wseg(cheapId, 'done').click();
-ok('済は今週の枠から外れる', budget()[0].includes('まで抜ける') || budget()[0].includes('足りない'), budget()[0]);
+ok('来週以降を外すと毎週残すが減る', budget()[1].includes('毎週残す 6,345'), budget()[1]);
+ok('今週の列は来週以降に影響されない', budget()[0].includes('今週やる 6,795'), budget()[0]);
 
-// 来週以降が効くのは先の週があるとき（12/10 だと今週しか残っていない）
-setInput('#nowOverride', '2026-11-10T19:27');
-const lvWithFuture = heroLevel();
+wseg(cheapId, 'none').click();
+ok('今週やらないと今週の枠が減る', budget()[0].includes('今週やる 6,345'), budget()[0]);
+wseg(cheapId, 'done').click();
+ok('済は今週の枠から外れる', budget()[0].includes('今週やる 6,345'), budget()[0]);
+wseg(cheapId, 'plan').click();
+
+const lvFull = heroLevel();
 const futureIds = all('input[data-future]').map(el => el.dataset.future);
 for (const id of futureIds) { const el = futureBox(id); el.checked = false; fire(el, 'input'); }
-ok('来週以降を全部外すと足りない', budget()[1].includes('足りない') && budget()[1].includes('5,135'), budget()[1]);
-ok('来週以降を全部外すと着地点が下がる', heroLevel() < lvWithFuture, `${lvWithFuture} -> ${heroLevel()}`);
-ok('result warns about the shortfall', text('#resultPanel').includes('足りない'), text('#resultPanel').slice(-60));
+ok('全部外すと足りないに変わる', budget()[1].includes('足りない'), budget()[1]);
+ok('着地点も下がる', heroLevel() < lvFull, `${lvFull} -> ${heroLevel()}`);
 
 for (const id of futureIds) { const el = futureBox(id); el.checked = true; fire(el, 'input'); }
-ok('戻すと着地点も戻る', heroLevel() === lvWithFuture, String(heroLevel()));
-setInput('#nowOverride', '2026-12-10T12:00');
-ok('基準日時を戻すと着地点も戻る', heroLevel() === lv12, String(heroLevel()));
+ok('戻すと抜ける表示に戻る', budget()[1].includes('まで抜ける'), budget()[1]);
+ok('着地点も戻る', heroLevel() === lvFull, String(heroLevel()));
 
+console.log('\n# chart');
+ok('chart is an svg', $('#chart') && $('#chart').tagName.toLowerCase() === 'svg');
+ok('chart has a target line', all('#chart .target').length === 1);
+const weeks = Number(/全(\d+)週/.exec(text('#chartHint'))?.[1]);
+ok('chart plots now plus every week', all('#chart circle').length === weeks + 1, `${all('#chart circle').length} dots / ${weeks} weeks`);
+ok('chart labels the level of each point', all('#chart .lv').length === weeks + 1, String(all('#chart .lv').length));
+ok('chart is described for screen readers', ($('#chart').getAttribute('aria-label') || '').includes('目標'), $('#chart').getAttribute('aria-label'));
+
+setInput('#nowOverride', '2026-12-10T12:00');
+const lvBase = heroLevel();
 console.log('\n# season: nothing planned by default');
 const rows = all('#seasonRows tr');
 ok('every season mission listed', rows.length === 11, String(rows.length));
@@ -142,11 +151,11 @@ const liveId = liveRow.querySelector('button[data-s]').dataset.s;
 seg(liveId, 'plan').click();
 ok('やる adds it to the plan', text('#seasonTotals').includes('やる1件'), text('#seasonTotals'));
 const lvPlan = heroLevel();
-ok('やる raises the projection', lvPlan > lv12, `${lv12} -> ${lvPlan}`);
+ok('やる raises the projection', lvPlan > lvBase, `${lvBase} -> ${lvPlan}`);
 
 seg(liveId, 'done').click();
 ok('済 is reported separately', text('#seasonTotals').includes('済1件'), text('#seasonTotals'));
-ok('済 is not added again', heroLevel() === lv12, String(heroLevel()));
+ok('済 is not added again', heroLevel() === lvBase, String(heroLevel()));
 
 seg(liveId, 'none').click();
 ok('やらない clears it', text('#seasonTotals').includes('やる0件'), text('#seasonTotals'));
@@ -177,14 +186,13 @@ tier.value = 'earth';
 fire(tier, 'change');
 ok('pearl checkbox hides again', $('#pearlRow').hidden === true);
 
-console.log('\n# timeline');
-ok('timeline has rows', all('#timelineRows tr').length > 0, String(all('#timelineRows tr').length));
-ok('current week is first', all('#timelineRows tr')[0].classList.contains('now-row'));
-const daysBefore = weekDays();
+console.log('\n# today');
+const dailyBefore = /残りデイリー ([\d,]+)/.exec(budget()[0])?.[1];
 toggle('[data-bind="todayDone"]', true);
-ok('today done removes a day', weekDays() === daysBefore - 1, `${daysBefore} -> ${weekDays()}`);
+const dailyAfter = /残りデイリー ([\d,]+)/.exec(budget()[0])?.[1];
+ok('today done removes a day from the week', dailyBefore !== dailyAfter && Number(dailyAfter.replace(/,/g, '')) < Number(dailyBefore.replace(/,/g, '')), `${dailyBefore} -> ${dailyAfter}`);
 toggle('[data-bind="todayDone"]', false);
-ok('unchecking restores the day', weekDays() === daysBefore, String(weekDays()));
+ok('unchecking restores it', /残りデイリー ([\d,]+)/.exec(budget()[0])?.[1] === dailyBefore, budget()[0]);
 
 console.log('\n# persistence');
 ok('state saved to localStorage', !!window.localStorage.getItem('genshin-bp-planner-v2'));

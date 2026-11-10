@@ -125,26 +125,13 @@
     </div>
   </section>
 
-  <section class="panel" aria-labelledby="timelineTitle">
+  <section class="panel" aria-labelledby="chartTitle">
     <div class="panel-head">
-      <h2 id="timelineTitle">週の内訳</h2>
-      <span class="hint" id="timelineHint"></span>
+      <h2 id="chartTitle">累計EXP</h2>
+      <span class="hint" id="chartHint"></span>
     </div>
-    <div class="table-wrap">
-      <table class="timeline-table">
-        <thead>
-          <tr>
-            <th>週</th>
-            <th class="num">デイリー</th>
-            <th class="num">ウィークリー</th>
-            <th class="num">シーズン</th>
-            <th class="num">この週</th>
-            <th class="num">累計</th>
-            <th class="num">Lv</th>
-          </tr>
-        </thead>
-        <tbody id="timelineRows"></tbody>
-      </table>
+    <div class="panel-body">
+      <svg class="chart" id="chart" role="img" viewBox="0 0 640 220"></svg>
     </div>
   </section>
 
