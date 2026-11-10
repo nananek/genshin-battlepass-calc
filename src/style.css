@@ -56,14 +56,14 @@
   .countdown .big { font-size: 22px; font-weight: 700; color: var(--text); }
   .countdown .small { color: var(--muted); font-size: 13px; }
 
-  main { padding: 24px 0 56px; }
+  main { padding: 24px 0 110px; }
 
   /* summary */
   .summary {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
-    margin-bottom: 20px;
+    margin-bottom: 0;
   }
   .s-card {
     background: var(--panel);
@@ -80,8 +80,6 @@
   .s-card.warn .value { color: var(--gold); }
   .s-card.bad .value { color: var(--red); }
 
-  .layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, .85fr); gap: 18px; align-items: start; }
-  .col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
   .panel {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -97,10 +95,48 @@
   .panel-head .hint { color: var(--dim); font-size: 12px; }
   .panel-body { padding: 16px 18px 18px; }
 
+  /* steps */
+  .stepper {
+    max-width: 960px; margin: 0 auto 18px;
+    display: flex; gap: 6px; overflow-x: auto;
+  }
+  .stepper button {
+    flex: 1 0 auto; border: 1px solid var(--line); background: #fff; color: var(--muted);
+    border-radius: 6px; padding: 8px 10px; font-size: 12.5px; white-space: nowrap;
+  }
+  .stepper button .n { font-weight: 700; margin-right: 4px; }
+  .stepper button.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .step { max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+  .step[hidden] { display: none; }
+  .step-head { margin: 0; }
+  .step-head h2 { margin: 0; font-size: 20px; letter-spacing: .01em; }
+  .step-head p { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
+  .step-nav-wrap {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    background: var(--bg); border-top: 1px solid var(--line);
+  }
+  .step-nav {
+    max-width: 960px; margin: 0 auto; padding: 10px 20px calc(10px + env(safe-area-inset-bottom));
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
+  }
+  .step-nav [data-nav="prev"] { justify-self: start; }
+  .step-nav [data-nav="next"] { justify-self: end; }
+  .step-pos { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .btn.primary:hover { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+  .btn:disabled { opacity: .45; cursor: default; pointer-events: none; }
+  .footer-panel > summary {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 15px 18px; color: var(--text); font-size: 15px; font-weight: 600;
+    cursor: pointer; list-style: none;
+  }
+  .footer-panel > summary::-webkit-details-marker { display: none; }
+  .footer-panel > summary::before { content: "▸ "; color: var(--dim); font-weight: 400; }
+  .footer-panel[open] > summary::before { content: "▾ "; }
+  .footer-panel > summary .hint { margin-left: auto; font-weight: 400; }
+  .footer-panel .panel-body { padding-top: 0; }
+
   /* week meter */
-  .week-input { padding: 14px 18px 0; border-bottom: 1px solid var(--line-soft); }
-  .week-input .field { border-bottom: 0; padding-top: 0; }
-  .week-input .check { padding-bottom: 10px; }
   .meter-labels { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px; }
   .meter-labels .now { font-size: 20px; font-weight: 700; }
   .meter-labels .now span { color: var(--muted); font-size: 13px; font-weight: 500; }
@@ -239,11 +275,10 @@
   .footer li { margin: 2px 0; }
   .footer code { color: #334155; background: #f1f3f6; border: 1px solid var(--line-soft); border-radius: 4px; padding: 0 4px; }
 
-  .save-state { color: var(--dim); font-size: 11px; }
+  .save-state { color: var(--dim); font-size: 11px; margin-left: 8px; white-space: nowrap; }
 
   @media (max-width: 1000px) {
     .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .layout { grid-template-columns: 1fr; }
   }
   @media (max-width: 560px) {
     .wrap, .hero-inner { padding-left: 14px; padding-right: 14px; }
@@ -254,6 +289,11 @@
     .week-grid { grid-template-columns: 1fr 1fr; }
     th, td { padding: 8px 7px; }
     .seg button { padding: 3px 7px; }
+    .stepper button { font-size: 11px; padding: 7px 4px; }
+    .stepper button .n { margin-right: 3px; }
+    .step-head h2 { font-size: 18px; }
+    .step-nav { padding: 8px 14px calc(8px + env(safe-area-inset-bottom)); }
+    .step-nav .btn { min-width: 76px; }
   }
   @media (max-width: 720px) {
     .responsive thead { display: none; }

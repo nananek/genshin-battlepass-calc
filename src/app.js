@@ -286,6 +286,7 @@
   }
 
   let state = loadState();
+  let currentStep = 1;
 
   function save() {
     try {
@@ -705,9 +706,37 @@
     }
   });
 
+  function showStep(n, scroll = true) {
+    currentStep = Math.max(1, Math.min(4, Number(n) || 1));
+    document.querySelectorAll('.step').forEach(el => {
+      el.hidden = Number(el.dataset.step) !== currentStep;
+    });
+    document.querySelectorAll('[data-step-go]').forEach(el => {
+      const on = Number(el.dataset.stepGo) === currentStep;
+      el.classList.toggle('active', on);
+      if (on) el.setAttribute('aria-current', 'step');
+      else el.removeAttribute('aria-current');
+    });
+    const prev = document.querySelector('[data-nav="prev"]');
+    const next = document.querySelector('[data-nav="next"]');
+    if (prev) prev.disabled = currentStep === 1;
+    if (next) next.textContent = currentStep === 4 ? '最初へ' : '次へ';
+    const pos = document.getElementById('stepPos');
+    if (pos) pos.textContent = `${currentStep} / 4`;
+    if (scroll) {
+      const top = document.getElementById('stepper');
+      if (top && typeof top.scrollIntoView === 'function') {
+        try { top.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+      }
+    }
+  }
+
   document.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
+    if (b.dataset.stepGo) { showStep(Number(b.dataset.stepGo)); return; }
+    if (b.dataset.nav === 'prev') { showStep(currentStep - 1); return; }
+    if (b.dataset.nav === 'next') { showStep(currentStep === 4 ? 1 : currentStep + 1); return; }
     if (b.dataset.w !== undefined) {
       const id = b.dataset.w, v = b.dataset.v;
       state.weekly[id] = { ...(state.weekly[id] || {}), thisWeek: v };
@@ -744,6 +773,7 @@
         state = structuredClone(DEFAULT_STATE);
         localStorage.removeItem(STORE_KEY);
         bindInputs();
+        showStep(1);
       }
     } else if (act === 'now-clear') {
       state.nowOverride = '';
@@ -781,4 +811,5 @@
 
   bindInputs();
   render();
+  showStep(1, false);
 })();

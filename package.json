@@ -5,6 +5,11 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node test/calc.test.mjs"
+    "test:calc": "node test/calc.test.mjs",
+    "test:ui": "npm run build && node test/ui.test.mjs",
+    "test": "npm run test:calc && npm run test:ui"
+  },
+  "devDependencies": {
+    "jsdom": "^31.0.0"
   }
 }

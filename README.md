@@ -1,16 +1,27 @@
 # 紀行プランナー
 
-原神の紀行（バトルパス）を「今週あと何をやるか」から組み立てる静的サイト。ライト系のフラットデザインで、ビルドすると単一HTMLになる。
+原神の紀行（バトルパス）を「今週あと何をやるか」から組み立てる静的サイト。ライト系フラットで、入力を4ステップに分けている。
+
+## 画面
+
+1. **現在** — 前週までのLvとLv内経験値、今週すでに獲得したEXP、プレイ日数、購入プラン。
+2. **今週** — ウィークリー任務を 済 / 予定 / なし で申告。「来週以降」は毎週やるものだけON。
+3. **シーズン** — シーズン任務を 済 / 予定 / なし で申告。
+4. **結果** — 着地Lv、目標までの不足、Lv購入数、週別タイムライン。
+
+前週までの結果は「現在の紀行Lv」と「現在のLv内経験値」に入れる。週ごとの履歴は持たない。1週目に消化したシーズン任務は「済」にすれば、現在Lvに含まれている前提で扱う。
 
 ## 構成
 
 ```
-src/index.html            画面のテンプレート
-src/style.css             見た目
+src/index.html            画面テンプレート（4ステップ）
+src/style.css             ライト系フラットの見た目
 src/app.js                計算とUI
 data/season.json          シーズン任務・ウィークリー・デイリーのデータ
 build.mjs                 data と src を dist/index.html にまとめる
 test/calc.test.mjs        計算ロジックのテスト
+test/ui.test.mjs          4ステップUIのテスト（jsdom）
+.github/workflows/ci.yml  push/PR のテストとビルド
 .github/workflows/pages.yml  GitHub Pages へのデプロイ
 dist/                     生成物（コミットしない）
 ```
@@ -18,18 +29,27 @@ dist/                     生成物（コミットしない）
 ## ローカル
 
 ```sh
+npm ci
 npm test
 npm run build
 # dist/index.html をブラウザで開く
 ```
 
-依存パッケージはない。`npm install` は不要。
+開発依存は `jsdom` のみ。実行時の外部依存はない。
+
+## テストとCI
+
+- `test/calc.test.mjs` — 日付境界、週上限、シーズン加算、真珠の歌、AR、逆算、カスタム任務など。
+- `test/ui.test.mjs` — ステップ1→2→3→4の遷移、入力値の反映、ウィークリー/シーズン申告、結果とタイムラインの表示。
+- `npm test` は計算テスト → ビルド → UIテストの順に実行する。
+- `ci.yml` は push / pull request で `npm ci` → `npm test` → `npm run build`。
+- `pages.yml` は `main` への push でテスト・ビルドし、`dist` を Pages にデプロイする。
 
 ## GitHub Pages
 
 1. `main` に push する。
 2. リポジトリの Settings → Pages → Build and deployment → Source を **GitHub Actions** にする。
-3. `.github/workflows/pages.yml` がテストとビルドを実行し、`dist` を公開する。
+3. `pages.yml` が `dist` を公開する。
 
 ## シーズン更新
 
