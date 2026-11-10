@@ -15,7 +15,7 @@ const dom = new JSDOM(fs.readFileSync(htmlPath, 'utf8'), {
   runScripts: 'dangerously',
   url: 'https://example.test/',
   beforeParse(window) {
-    // アプリの loadState / リセットで使う。jsdom の window には無い。
+    // アプリの loadState で使う。jsdom の window には無い。
     window.structuredClone = (v) => JSON.parse(JSON.stringify(v));
   },
 });
@@ -23,14 +23,24 @@ const dom = new JSDOM(fs.readFileSync(htmlPath, 'utf8'), {
 const { window } = dom;
 const { document } = window;
 const $ = (sel) => document.querySelector(sel);
+const all = (sel) => [...document.querySelectorAll(sel)];
 const text = (sel) => ($(sel)?.textContent || '').replace(/\s+/g, ' ').trim();
-const visibleStep = () => $('.step:not([hidden])')?.dataset.step;
+const fire = (el, type = 'input') => el.dispatchEvent(new window.Event(type, { bubbles: true }));
 const setInput = (sel, value) => {
   const el = $(sel);
   if (!el) throw new Error(`input not found: ${sel}`);
   el.value = value;
-  el.dispatchEvent(new window.Event('input', { bubbles: true }));
+  fire(el, 'input');
 };
+const heroLevel = () => {
+  const m = /Lv (\d+)/.exec(text('#resultPanel'));
+  return m ? Number(m[1]) : null;
+};
+const kvLine = (label) => {
+  const k = all('#resultPanel .kv .k').find(el => el.textContent.trim() === label);
+  return k ? k.nextElementSibling.textContent.replace(/\s+/g, ' ').trim() : '';
+};
+const weekDays = () => Number(/（(\d)日）/.exec(all('#timelineRows tr')[0].textContent)?.[1]);
 
 let pass = 0;
 let fail = 0;
@@ -39,57 +49,94 @@ function ok(label, cond, detail = '') {
   else { fail++; console.log('FAIL ' + label + (detail ? ' (' + detail + ')' : '')); }
 }
 
-console.log('# step UI');
+console.log('# one page');
 ok('title has season name', document.title.includes('聖霊紀行'), document.title);
-ok('starts at step 1', visibleStep() === '1', visibleStep());
-ok('prev disabled at step 1', $('[data-nav="prev"]').disabled === true);
-ok('step 1 is active', $('[data-step-go="1"]').classList.contains('active'));
-ok('step position 1 / 4', text('#stepPos') === '1 / 4', text('#stepPos'));
+ok('three game inputs exist', !!($('#level') && $('#exp') && $('#weekEarned')));
+ok('labels use game wording',
+  document.body.textContent.includes('紀行レベル') &&
+  document.body.textContent.includes('このレベルの経験値') &&
+  document.body.textContent.includes('今週の獲得経験値'));
+ok('no step navigation', all('[data-nav]').length === 0);
+ok('no slider duplicate', all('input[type="range"]').length === 0);
+ok('no per-field description text', all('.desc').length === 0);
 
-setInput('#nowOverride', '2026-11-10T19:27');
+console.log('\n# inputs drive the projection');
+setInput('#nowOverride', '2026-12-10T12:00');
 setInput('#level', '12');
 setInput('#exp', '340');
 setInput('#weekEarned', '5200');
+const lv12 = heroLevel();
+ok('projection above the current level', lv12 > 12, String(lv12));
+ok('hero shows the target', text('#resultPanel').includes('/ 50'));
+ok('deficit shown as EXP', /[\d,]+ EXP/.test(kvLine('目標まで')), kvLine('目標まで'));
 
-ok('current level reflected', text('#summaryCards').includes('Lv 12'), text('#summaryCards').slice(0, 80));
+setInput('#level', '20');
+ok('higher level raises the projection', heroLevel() > lv12, `${lv12} -> ${heroLevel()}`);
+const lv20 = heroLevel();
+setInput('#level', '12');
+ok('lowering level restores it', heroLevel() === lv12, String(heroLevel()));
 
-$('[data-nav="next"]').click();
-ok('next goes to step 2', visibleStep() === '2', visibleStep());
-ok('step 2 is active', $('[data-step-go="2"]').classList.contains('active'));
-ok('prev enabled at step 2', $('[data-nav="prev"]').disabled === false);
-ok('step position 2 / 4', text('#stepPos') === '2 / 4', text('#stepPos'));
+console.log('\n# season missions');
+const rows = all('#seasonRows tr');
+ok('every season mission listed', rows.length === 11, String(rows.length));
+ok('expired plan is reported', text('#resultPanel').includes('期限切れ'), text('#resultPanel').slice(-80));
+ok('totals match the computed plan', text('#seasonTotals').includes('やる10件'), text('#seasonTotals'));
 
-$('button[data-w="boss"][data-v="plan"]').click();
-ok('weekly plan adds 450', text('#weeklyTotals').includes('予定 450'), text('#weeklyTotals'));
-ok('week panel reflects plan', text('#weekBody').includes('1,350') || text('#weekBody').includes('450'),
-  text('#weekBody').slice(0, 120));
+const lvBase = heroLevel();
+const liveRow = rows[rows.length - 1];
+const liveId = liveRow.querySelector('button[data-s]').dataset.s;
+liveRow.querySelector('button[data-v="none"]').click();
+ok('やらない removes it from the plan', text('#seasonTotals').includes('やる9件'), text('#seasonTotals'));
+const lvNone = heroLevel();
+ok('やらない lowers the projection', lvNone < lvBase, `${lvBase} -> ${lvNone}`);
 
-$('[data-nav="next"]').click();
-ok('next goes to step 3', visibleStep() === '3', visibleStep());
-ok('step 3 is active', $('[data-step-go="3"]').classList.contains('active'));
+document.querySelector(`button[data-s="${liveId}"][data-v="done"]`).click();
+ok('済 is counted separately', text('#seasonTotals').includes('済1件'), text('#seasonTotals'));
+ok('済 keeps it out of the plan like やらない', heroLevel() === lvNone, String(heroLevel()));
 
-$('button[data-s="stygian"][data-v="plan"]').click();
-ok('season plan adds 1,500', text('#seasonTotals').includes('予定 1,500'), text('#seasonTotals'));
+document.querySelector(`button[data-s="${liveId}"][data-v="plan"]`).click();
+ok('plan restores the projection', heroLevel() === lvBase, `${heroLevel()} vs ${lvBase}`);
 
-$('[data-nav="next"]').click();
-ok('next goes to step 4', visibleStep() === '4', visibleStep());
-ok('step 4 is active', $('[data-step-go="4"]').classList.contains('active'));
-ok('next becomes restart at step 4', text('[data-nav="next"]') === '最初へ', text('[data-nav="next"]'));
-ok('summary shows current level', text('#summaryCards').includes('Lv 12'));
-ok('result shows projected level', /Lv \d+/.test(text('#resultPanel')), text('#resultPanel').slice(0, 80));
-ok('timeline has rows', $('#timelineRows').children.length > 0, String($('#timelineRows').children.length));
+console.log('\n# settings');
+setInput('#ar', '20');
+ok('low AR shows the weekly shortfall', text('#resultPanel').includes('週上限に'), text('#resultPanel').slice(-100));
+setInput('#ar', '60');
+ok('AR60 has no shortfall note', !text('#resultPanel').includes('週上限に'));
 
-$('[data-nav="next"]').click();
-ok('restart returns to step 1', visibleStep() === '1', visibleStep());
-ok('next label returns', text('[data-nav="next"]') === '次へ', text('[data-nav="next"]'));
+setInput('#target', '30');
+ok('target change rewrites the hero', text('#resultPanel').includes('/ 30'), text('#resultPanel').slice(0, 40));
+setInput('#target', '50');
 
-$('[data-step-go="3"]').click();
-ok('stepper jumps to step 3', visibleStep() === '3', visibleStep());
-ok('stepper active follows', $('[data-step-go="3"]').classList.contains('active'));
-ok('step position 3 / 4', text('#stepPos') === '3 / 4', text('#stepPos'));
+const tier = $('#tier');
+tier.value = 'shinju';
+fire(tier, 'change');
+ok('pearl checkbox appears for 真珠の歌', $('#pearlRow').hidden === false);
+const beforePearl = heroLevel();
+const pearl = document.querySelector('[data-bind="pearlPending"]');
+pearl.checked = true;
+fire(pearl, 'input');
+ok('pearl Lv+10 raises the projection', heroLevel() > beforePearl, `${beforePearl} -> ${heroLevel()}`);
+pearl.checked = false;
+fire(pearl, 'input');
+fire(tier, 'change');
+tier.value = 'earth';
+fire(tier, 'change');
+ok('pearl checkbox hides again', $('#pearlRow').hidden === true);
 
-$('[data-nav="prev"]').click();
-ok('prev returns to step 2', visibleStep() === '2', visibleStep());
+console.log('\n# timeline');
+ok('timeline has rows', all('#timelineRows tr').length > 0, String(all('#timelineRows tr').length));
+ok('current week is first', all('#timelineRows tr')[0].classList.contains('now-row'));
+const daysBefore = weekDays();
+const today = document.querySelector('[data-bind="todayDone"]');
+today.checked = true;
+fire(today, 'input');
+ok('today done removes a day', weekDays() === daysBefore - 1, `${daysBefore} -> ${weekDays()}`);
+today.checked = false;
+fire(today, 'input');
+ok('unchecking restores the day', weekDays() === daysBefore, String(weekDays()));
+
+console.log('\n# persistence');
+ok('state saved to localStorage', !!window.localStorage.getItem('genshin-bp-planner-v2'));
 
 window.close();
 

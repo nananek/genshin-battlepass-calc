@@ -15,7 +15,7 @@ const code =
   'globalThis.window = globalThis;\n' +
   'globalThis.window.__BP_DATA__ = ' + JSON.stringify(data) + ';\n' +
   prefix +
-  '\nglobalThis.BP = { run, compute, parseJst, gameDayStart, weekStart, WEEKLY, SEASON, DAILY, DAY, TZ };\n})();\n';
+  '\nglobalThis.BP = { compute, parseJst, gameDayStart, weekStart, WEEKLY, SEASON, DAILY, DAY, TZ };\n})();\n';
 await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
 
 const { DAILY, WEEKLY, SEASON, compute, parseJst, gameDayStart, weekStart } = globalThis.BP;
@@ -23,6 +23,7 @@ const { DAILY, WEEKLY, SEASON, compute, parseJst, gameDayStart, weekStart } = gl
 const dailyTotal = DAILY.reduce((s, m) => s + m.exp, 0);
 const weeklyTotal = WEEKLY.reduce((s, m) => s + m.exp, 0);
 const seasonTotal = SEASON.reduce((s, m) => s + m.exp, 0);
+const NOW = '2026-11-10T19:27';
 
 let pass = 0;
 let fail = 0;
@@ -36,6 +37,21 @@ function ok(label, cond, detail = '') {
 }
 function section(name) { console.log('\n# ' + name); }
 
+const base = {
+  target: 50,
+  level: 1,
+  exp: 0,
+  weekEarned: 0,
+  todayDone: false,
+  ar: 60,
+  tier: 'earth',
+  pearlPending: false,
+  seasonEnd: data.season.end,
+  nowOverride: NOW,
+  season: Object.fromEntries(SEASON.map(m => [m.id, { status: 'none' }])),
+};
+const allPlan = Object.fromEntries(SEASON.map(m => [m.id, { status: 'plan' }]));
+
 section('data');
 eq('daily total', dailyTotal, 695);
 eq('weekly total', weeklyTotal, 6795);
@@ -45,24 +61,6 @@ ok('unique ids', new Set(allIds).size === allIds.length);
 ok('season end after start', parseJst(data.season.end) > parseJst(data.season.start));
 ok('all season missions start before end', SEASON.every(m => parseJst(m.from) < parseJst(data.season.end)));
 
-const base = {
-  target: 50,
-  level: 1,
-  exp: 0,
-  weekEarned: 0,
-  todayDone: false,
-  playDays: 7,
-  ar: 60,
-  tier: 'earth',
-  pearlPending: false,
-  seasonEnd: data.season.end,
-  nowOverride: '2026-11-10T19:27',
-  daily: Object.fromEntries(DAILY.map(m => [m.id, true])),
-  weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'none', future: false }])),
-  season: Object.fromEntries(SEASON.map(m => [m.id, { status: 'none' }])),
-  custom: [],
-};
-
 section('date boundaries');
 eq('04:59 is previous game day',
   new Date(gameDayStart(parseJst('2026-11-10T04:59')) + 9 * 3600e3).toISOString().slice(0, 10), '2026-11-09');
@@ -71,80 +69,66 @@ eq('05:00 starts new game day',
 eq('week starts Monday 05:00',
   new Date(weekStart(parseJst('2026-11-10T05:00')) + 9 * 3600e3).toISOString().slice(0, 16), '2026-11-09T05:00');
 
-section('daily only');
-const dailyOnly = compute(base);
-const totalDays = dailyOnly.weeks.reduce((s, w) => s + w.days, 0);
-eq('daily only total', dailyOnly.total, dailyTotal * totalDays);
-eq('daily only level', dailyOnly.projectedLevel, Math.min(50, Math.floor(dailyOnly.total / 1000) + 1));
-ok('daily only finite', Number.isFinite(dailyOnly.total) && Number.isFinite(dailyOnly.deficit));
-ok('daily only cap respected', dailyOnly.weeks.every(w => w.applied <= 10000));
+section('daily + weekly');
+const d0 = compute(base);
+ok('weeks are contiguous 7 days', d0.weeks.every((w, i) => i === 0 || w.ws - d0.weeks[i - 1].ws === 7 * 86400000));
+ok('cap respected every week', d0.weeks.every(w => w.applied <= 10000));
+ok('full weeks reach the cap', d0.weeks.slice(1).every(w => w.applied === 10000));
+eq('current week days', d0.weeks[0].days, 6); // 11/10(火) 19:27、月曜の分はもう終わっている
+eq('weekly per week', d0.weeklyFull, 10000);
+eq('ar shortfall', d0.weeklyShort, 0);
+ok('total increases monotonically', d0.weeks.every((w, i) => i === 0 || w.total >= d0.weeks[i - 1].total));
+ok('level within 1..50', d0.weeks.every(w => w.level >= 1 && w.level <= 50));
 
-section('weekly cap');
-const firstWeekly = WEEKLY[0];
-const cap = compute({
-  ...base,
-  weekEarned: 9000,
-  weekly: { ...base.weekly, [firstWeekly.id]: { thisWeek: 'plan', future: false } },
-});
-const raw = cap.currentWeek.rawDaily + cap.currentWeek.rawWeekly;
-eq('remaining cap', 10000 - 9000, 1000);
-eq('cap applied', cap.currentWeek.applied, Math.min(1000, raw));
-eq('cap overflow', cap.currentWeek.overflow, Math.max(0, raw - 1000));
-
-section('today done');
+section('this week');
+const capNow = compute({ ...base, weekEarned: 9000 });
+eq('room after 9000 earned', capNow.currentWeek.applied, Math.min(1000, capNow.currentWeek.rawDaily + capNow.currentWeek.rawWeekly));
+eq('overflow counts the rest', capNow.currentWeek.overflow, Math.max(0, capNow.currentWeek.rawDaily + capNow.currentWeek.rawWeekly - 1000));
 const noToday = compute({ ...base, todayDone: true });
-ok('today done reduces days', noToday.weeks[0].days < dailyOnly.weeks[0].days);
-eq('today done applied', noToday.weeks[0].applied, dailyTotal * noToday.weeks[0].days);
+eq('today done removes one day', noToday.currentWeek.days, d0.currentWeek.days - 1);
+eq('today done removes 695 from the plan', noToday.currentWeek.rawDaily, d0.currentWeek.rawDaily - dailyTotal);
 
 section('season missions');
-const allSeason = Object.fromEntries(SEASON.map(m => [m.id, { status: 'plan' }]));
-const seasonPlan = compute({ ...base, season: allSeason });
-eq('planned season total', seasonPlan.plannedSeasonExp, seasonTotal);
-eq('season plan total', seasonPlan.total, dailyOnly.total + seasonTotal);
-ok('season plan no NaN', Number.isFinite(seasonPlan.total) && seasonPlan.weeks.every(w => Number.isFinite(w.total)));
+const plan = compute({ ...base, season: allPlan });
+eq('season adds exactly its total', plan.total - d0.total, seasonTotal);
+eq('season is outside the week cap', plan.weeks.reduce((s, w) => s + w.applied, 0), d0.weeks.reduce((s, w) => s + w.applied, 0));
+eq('no-season equals base', plan.totalNoSeason, plan.total - seasonTotal);
+eq('planned season exp', plan.plannedSeasonExp, seasonTotal);
 
-section('weekly missions');
-const allFuture = Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'none', future: true }]));
-const allWeekly = compute({ ...base, weekly: allFuture });
-const expectedAllWeekly = allWeekly.weeks.reduce(
-  (s, w) => s + Math.min(10000, dailyTotal * w.days + (w.isCurrent ? 0 : weeklyTotal)), 0);
-eq('all weekly total', allWeekly.total, expectedAllWeekly);
-ok('all weekly cap respected', allWeekly.weeks.every(w => w.applied <= 10000));
-ok('weekly overflow counted', allWeekly.totalOverflow === allWeekly.weeks.reduce((s, w) => s + w.overflow, 0));
+const done = compute({ ...base, season: Object.fromEntries(SEASON.map(m => [m.id, { status: 'done' }])) });
+eq('done missions add nothing', done.total, d0.total);
+eq('done missions are not planned', done.plannedSeasonExp, 0);
 
-section('everything');
-const everything = compute({ ...base, weekly: allFuture, season: allSeason });
-eq('everything total', everything.total, allWeekly.total + seasonTotal);
-eq('reached consistency', everything.reached !== null, everything.total >= 49000);
+section('expired plans');
+const after = compute({ ...base, nowOverride: '2026-11-22T12:00', season: allPlan });
+eq('expired mission dropped', after.plannedSeasonExp, seasonTotal - 1500);
+eq('expired counted once', after.expired.length, 1);
 
 section('ar');
 for (const ar of [20, 28, 32, 60]) {
   const d = compute({ ...base, ar });
   const expected = WEEKLY.filter(m => m.ar <= ar).reduce((s, m) => s + m.exp, 0);
-  eq(`ar${ar} max`, d.arMax, expected);
+  eq(`ar${ar} weekly max`, d.arMax, expected);
 }
-
-section('custom mission');
-const custom = compute({
-  ...base,
-  custom: [{ id: 'custom-test', name: 'テスト', exp: 1000, status: 'plan' }],
-});
-eq('custom planned', custom.plannedSeasonExp, 1000);
-eq('custom total', custom.total, dailyOnly.total + 1000);
+eq('ar20 misses the cap', compute({ ...base, ar: 20 }).weeklyShort, 10000 - (dailyTotal * 7 + 4545));
+eq('ar28 reaches the cap', compute({ ...base, ar: 28 }).weeklyShort, 0);
+ok('ar20 raw weekly below cap', compute({ ...base, ar: 20 }).weeks[1].rawDaily + compute({ ...base, ar: 20 }).weeks[1].rawWeekly < 10000);
 
 section('pearl');
 const pearl = compute({ ...base, tier: 'shinju', pearlPending: true });
-eq('pearl total', pearl.total, dailyOnly.total + 10000);
-eq('pearl level', pearl.projectedLevel, Math.min(50, Math.floor(pearl.total / 1000) + 1));
+eq('pearl adds 10000', pearl.total - d0.total, 10000);
+eq('pearl ignored for other tiers', compute({ ...base, tier: 'sky', pearlPending: true }).total, d0.total);
 
-section('reverse');
-const reverse = compute({ ...base, season: allSeason });
-ok('reverse deficit exists', reverse.deficit > 0, `deficit=${reverse.deficit}`);
-ok('reverse extra found', reverse.extraNeeded !== null, `extra=${reverse.extraNeeded}`);
-if (reverse.extraNeeded !== null) {
-  ok('reverse extra within max', reverse.extraNeeded >= 0 && reverse.extraNeeded <= reverse.maxExtra,
-    `${reverse.extraNeeded} <= ${reverse.maxExtra}`);
-}
+section('target and purchase');
+const short = compute({ ...base, level: 1, exp: 0, target: 50, nowOverride: '2026-12-10T12:00' });
+ok('deficit exists', short.deficit > 0, `deficit=${short.deficit}`);
+eq('deficit matches target', short.deficit, 49000 - short.total);
+ok('buy levels cover the deficit', short.buyLevels * 1000 >= short.deficit || short.projectedLevel + short.buyLevels === 50, `${short.buyLevels} Lv`);
+eq('buy cost is 150 gems per level', short.buyCost, short.buyLevels * 150);
+const reachedTarget = compute({ ...base, target: 2, level: 3 });
+eq('reached target has no deficit', reachedTarget.deficit, 0);
+eq('reached target needs no purchase', reachedTarget.buyLevels, 0);
+ok('reached date set', reachedTarget.reached !== null, String(reachedTarget.reached));
 
 section('past season');
 const past = compute({ ...base, seasonEnd: '2026-11-09T04:59' });
