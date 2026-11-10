@@ -25,7 +25,7 @@
     { key: 'abyss', label: '深境螺旋をやる', group: 'season', def: false },
     { key: 'theater', label: '幻想シアターをやる', group: 'season', def: false },
     { key: 'stygian', label: '幽境の激戦をやる', group: 'season', def: false },
-    { key: 'pull', label: 'ガチャを回す', group: 'weekly', def: false },
+    { key: 'pull', label: 'ガチャを回す（モラ50万が今週で終わる）', group: 'weekly', def: false },
     { key: 'tcg', label: '七聖召喚をやる', group: 'weekly', def: false },
     { key: 'farm', label: '秘境・ボス・地脈を周回する', group: 'weekly', def: false },
     { key: 'cook', label: '料理を作る', group: 'weekly', def: true },
@@ -400,8 +400,12 @@
           <button type="button" data-a="${q.key}" data-v="no" class="${a[q.key] ? '' : 'on none'}">いいえ</button>
         </div>
       </div>`;
-    $('#quizSeason').innerHTML = ANSWERS.filter(q => q.group === 'season').map(row).join('');
-    $('#quizWeekly').innerHTML = ANSWERS.filter(q => q.group === 'weekly').map(row).join('');
+    const group = (title, qs) => `<div class="quiz-group"><h3>${title}</h3>${qs.map(row).join('')}</div>`;
+    $('#quizBody').innerHTML =
+      group('シーズン任務', ANSWERS.filter(q => q.group === 'season')) +
+      group('ウィークリー', ANSWERS.filter(q => q.group === 'weekly'));
+    const yes = ANSWERS.filter(q => a[q.key]).length;
+    $('#quizCount').textContent = `はい ${yes} / ${ANSWERS.length}`;
   }
 
   function renderWeekly(d) {
@@ -570,7 +574,27 @@
     render();
   });
 
+  function openQuiz() {
+    renderQuiz();
+    $('#quizModal').hidden = false;
+    document.body.classList.add('modal-open');
+    const first = $('#quizBody button');
+    if (first) first.focus();
+  }
+  function closeQuiz() {
+    $('#quizModal').hidden = true;
+    document.body.classList.remove('modal-open');
+    const open = $('#quizOpen');
+    if (open) open.focus();
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('#quizModal').hidden) closeQuiz();
+  });
+
   document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-quiz-open]')) { openQuiz(); return; }
+    if (e.target.closest('[data-quiz-close]')) { closeQuiz(); return; }
     const ans = e.target.closest('button[data-a]');
     if (ans) {
       state.answers[ans.dataset.a] = ans.dataset.v === 'yes';

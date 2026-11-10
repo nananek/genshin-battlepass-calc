@@ -74,17 +74,12 @@
   <section class="panel" aria-labelledby="quizTitle">
     <div class="panel-head">
       <h2 id="quizTitle">問診票</h2>
-      <span class="hint">答えると下が埋まる</span>
     </div>
-    <div class="panel-body quiz">
-      <div>
-        <h3>シーズン任務</h3>
-        <div id="quizSeason"></div>
-      </div>
-      <div>
-        <h3>ウィークリー</h3>
-        <div id="quizWeekly"></div>
-      </div>
+    <div class="panel-body">
+      <button type="button" class="btn-wide" id="quizOpen" data-quiz-open>
+        <span>問診票を回答する</span>
+        <span class="btn-count" id="quizCount"></span>
+      </button>
     </div>
   </section>
 
@@ -157,6 +152,20 @@
     </div>
   </details>
 </main>
+
+<div class="modal" id="quizModal" hidden>
+  <div class="modal-backdrop" data-quiz-close></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="quizModalTitle">
+    <div class="modal-head">
+      <h2 id="quizModalTitle">問診票</h2>
+      <button type="button" class="btn-close" data-quiz-close aria-label="閉じる">✕</button>
+    </div>
+    <div class="modal-body" id="quizBody"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn-primary" data-quiz-close>閉じる</button>
+    </div>
+  </div>
+</div>
 
 <div class="landing" aria-live="polite">
   <div class="landing-inner" id="resultPanel"></div>

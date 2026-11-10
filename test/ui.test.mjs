@@ -91,13 +91,21 @@ ok('season comes before weekly', (() => {
 })(), panelOrder().join(' / '));
 
 console.log('\n# quiz');
+ok('quiz is closed at first', $('#quizModal').hidden === true);
+$('#quizOpen').click();
+ok('button opens the questionnaire', $('#quizModal').hidden === false);
 ok('eleven questions', all('button[data-a]').length === 22 && answerKeys().length === 11, String(answerKeys().length));
-ok('questions are grouped', text('#quizSeason').includes('聖遺物') && text('#quizWeekly').includes('七聖召喚'));
+ok('questions are grouped', text('#quizBody').includes('聖遺物') && text('#quizBody').includes('七聖召喚'));
+ok('count is shown on the button', /はい \d+ \/ 11/.test(text('#quizCount')), text('#quizCount'));
 const quizOn = (key) => document.querySelector(`button[data-a="${key}"][data-v="yes"]`).classList.contains('on');
 ok('artifacts default to yes', quizOn('artifacts'));
 ok('cooking defaults to yes', quizOn('cook'));
 ok('hard content defaults to no', !quizOn('abyss') && !quizOn('theater') && !quizOn('stygian'));
 ok('七聖召喚 defaults to no', !quizOn('tcg'));
+ok('ガチャの説明がラベルに入っている', text('#quizBody').includes('モラ50万'), text('#quizBody').slice(0, 60));
+document.querySelector('[data-quiz-close]').click();
+ok('close button hides the questionnaire', $('#quizModal').hidden === true);
+$('#quizOpen').click();
 
 console.log('\n# quiz fills the tables');
 setInput('#nowOverride', '2026-12-10T12:00');
