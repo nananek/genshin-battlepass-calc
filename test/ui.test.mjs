@@ -129,6 +129,8 @@ const futureIds = all('input[data-future]').map(el => el.dataset.future);
 for (const id of futureIds) { const el = futureBox(id); el.checked = false; fire(el, 'input'); }
 ok('全部外すと足りないに変わる', budget()[1].includes('足りない'), budget()[1]);
 ok('着地点も下がる', heroLevel() < lvFull, `${lvFull} -> ${heroLevel()}`);
+ok('no cap-based note in the bar', !text('#resultPanel').includes('週上限'), text('#resultPanel').slice(-60));
+ok('bar reports the shortage instead', /不足[\s\d,]+EXP/.test(text('#resultPanel')), text('#resultPanel').slice(-50));
 
 for (const id of futureIds) { const el = futureBox(id); el.checked = true; fire(el, 'input'); }
 ok('戻すと抜ける表示に戻る', budget()[1].includes('まで抜ける'), budget()[1]);
