@@ -181,6 +181,13 @@
   }
   .btn-primary:hover { background: #1d4ed8; }
   .btn-close { border: 0; background: transparent; color: var(--muted); font-size: 16px; padding: 4px 6px; }
+  .btn-ghost {
+    padding: 8px 14px; border-radius: var(--radius); border: 1px solid var(--line);
+    background: #fff; color: var(--muted); font-size: 14px;
+  }
+  .btn-ghost:hover { color: var(--text); background: #f7f9fb; }
+  .btn-ghost[disabled] { opacity: .4; pointer-events: none; }
+  .modal-step { margin-left: auto; margin-right: 10px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
   .btn-close:hover { color: var(--text); }
 
   .modal[hidden] { display: none; }
@@ -199,7 +206,7 @@
   .modal-body { padding: 6px 16px 10px; }
   .modal-foot {
     position: sticky; bottom: 0; background: #fff;
-    display: flex; justify-content: flex-end; padding: 10px 16px;
+    display: flex; justify-content: space-between; gap: 10px; padding: 10px 16px;
     border-top: 1px solid var(--line-soft);
   }
   body.modal-open { overflow: hidden; }

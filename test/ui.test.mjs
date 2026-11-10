@@ -50,8 +50,19 @@ const seg = (id, v) => document.querySelector(`button[data-s="${id}"][data-v="${
 const wseg = (id, v) => document.querySelector(`button[data-w="${id}"][data-v="${v}"]`);
 const futureBox = (id) => document.querySelector(`input[data-future="${id}"]`);
 const budget = () => all('#weeklyBudget .budget').map(p => p.textContent.replace(/\s+/g, ' ').trim());
-const answerKeys = () => [...new Set(all('button[data-a]').map(b => b.dataset.a))];
-const answer = (key, yes) => document.querySelector(`button[data-a="${key}"][data-v="${yes ? 'yes' : 'no'}"]`).click();
+const SEASON_KEYS = ['events', 'artifacts', 'abyss', 'theater', 'stygian'];
+const WEEKLY_KEYS = ['pull', 'tcg', 'farm', 'cook', 'forge', 'friendpot', 'furniture'];
+const answerKeys = () => [...SEASON_KEYS, ...WEEKLY_KEYS];
+const stepNo = () => Number(/^(\d) \//.exec(text('#quizStep'))?.[1]);
+const goPage = (n) => {
+  for (let i = 0; i < 4 && stepNo() !== n; i += 1) {
+    document.querySelector(stepNo() < n ? '[data-quiz-next]' : '[data-quiz-prev]').click();
+  }
+};
+const answer = (key, yes) => {
+  goPage(SEASON_KEYS.includes(key) ? 1 : 2);
+  document.querySelector(`button[data-a="${key}"][data-v="${yes ? 'yes' : 'no'}"]`).click();
+};
 const answerAll = (yes) => { for (const k of answerKeys()) answer(k, yes); };
 const seasonRows = () => all('#seasonRows tr');
 const rowId = (tr) => tr.querySelector('button[data-s]').dataset.s;
@@ -94,19 +105,31 @@ console.log('\n# quiz');
 ok('quiz is closed at first', $('#quizModal').hidden === true);
 $('#quizOpen').click();
 ok('button opens the questionnaire', $('#quizModal').hidden === false);
-ok('twelve questions', all('button[data-a]').length === 24 && answerKeys().length === 12, String(answerKeys().length));
-ok('questions are grouped', text('#quizBody').includes('聖遺物') && text('#quizBody').includes('七聖召喚'));
+ok('first page has the season questions', all('button[data-a]').length === 10 && stepNo() === 1, `${all('button[data-a]').length} buttons / step ${stepNo()}`);
+ok('first page is シーズン任務', text('#quizBody').includes('聖遺物') && !text('#quizBody').includes('七聖召喚'), text('#quizBody').slice(0, 30));
+ok('prev is disabled on the first page', document.querySelector('[data-quiz-prev]').disabled === true);
+document.querySelector('[data-quiz-next]').click();
+ok('second page holds the weekly questions', stepNo() === 2 && all('button[data-a]').length === 14, `step ${stepNo()} / ${all('button[data-a]').length} buttons`);
+ok('second page is ウィークリー', text('#quizBody').includes('七聖召喚'), text('#quizBody').slice(0, 30));
+ok('next becomes 完了 on the last page', text('[data-quiz-next]') === '完了', text('[data-quiz-next]'));
+document.querySelector('[data-quiz-prev]').click();
+ok('prev returns to the first page', stepNo() === 1, String(stepNo()));
 ok('count is shown on the button', /はい \d+ \/ 12/.test(text('#quizCount')), text('#quizCount'));
-const quizOn = (key) => document.querySelector(`button[data-a="${key}"][data-v="yes"]`).classList.contains('on');
+const quizOn = (key) => {
+  goPage(SEASON_KEYS.includes(key) ? 1 : 2);
+  return document.querySelector(`button[data-a="${key}"][data-v="yes"]`).classList.contains('on');
+};
 ok('events default to yes', quizOn('events'));
 ok('artifacts default to yes', quizOn('artifacts'));
 ok('cooking defaults to yes', quizOn('cook'));
 ok('hard content defaults to no', !quizOn('abyss') && !quizOn('theater') && !quizOn('stygian'));
 ok('七聖召喚 defaults to no', !quizOn('tcg'));
+goPage(2);
 ok('モラの質問は行動で書く', text('#quizBody').includes('今週だけモラをたくさん使う'), text('#quizBody').slice(0, 40));
 document.querySelector('[data-quiz-close]').click();
 ok('close button hides the questionnaire', $('#quizModal').hidden === true);
 $('#quizOpen').click();
+ok('reopening starts at the first page', stepNo() === 1, String(stepNo()));
 
 console.log('\n# quiz fills the tables');
 setInput('#nowOverride', '2026-12-10T12:00');

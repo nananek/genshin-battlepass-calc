@@ -393,8 +393,15 @@
       ${notes.length ? `<div class="notes">${notes.join('')}</div>` : ''}`;
   }
 
+  const QUIZ_PAGES = [
+    { title: 'シーズン任務', group: 'season' },
+    { title: 'ウィークリー', group: 'weekly' },
+  ];
+  let quizPage = 0;
+
   function renderQuiz() {
     const a = state.answers;
+    const page = QUIZ_PAGES[quizPage];
     const row = (q) => `<div class="quiz-row">
         <span>${q.label}</span>
         <div class="seg">
@@ -402,10 +409,12 @@
           <button type="button" data-a="${q.key}" data-v="no" class="${a[q.key] ? '' : 'on none'}">いいえ</button>
         </div>
       </div>`;
-    const group = (title, qs) => `<div class="quiz-group"><h3>${title}</h3>${qs.map(row).join('')}</div>`;
-    $('#quizBody').innerHTML =
-      group('シーズン任務', ANSWERS.filter(q => q.group === 'season')) +
-      group('ウィークリー', ANSWERS.filter(q => q.group === 'weekly'));
+    const qs = ANSWERS.filter(q => q.group === page.group);
+    $('#quizBody').innerHTML = `<div class="quiz-group"><h3>${page.title}</h3>${qs.map(row).join('')}</div>`;
+    $('#quizStep').textContent = `${quizPage + 1} / ${QUIZ_PAGES.length}`;
+    $('[data-quiz-prev]').disabled = quizPage === 0;
+    $('[data-quiz-next]').textContent = quizPage === QUIZ_PAGES.length - 1 ? '完了' : '次へ';
+
     const yes = ANSWERS.filter(q => a[q.key]).length;
     $('#quizCount').textContent = `はい ${yes} / ${ANSWERS.length}`;
   }
@@ -577,6 +586,7 @@
   });
 
   function openQuiz() {
+    quizPage = 0;
     renderQuiz();
     $('#quizModal').hidden = false;
     document.body.classList.add('modal-open');
@@ -597,6 +607,11 @@
   document.addEventListener('click', (e) => {
     if (e.target.closest('[data-quiz-open]')) { openQuiz(); return; }
     if (e.target.closest('[data-quiz-close]')) { closeQuiz(); return; }
+    if (e.target.closest('[data-quiz-prev]')) { quizPage = Math.max(0, quizPage - 1); renderQuiz(); return; }
+    if (e.target.closest('[data-quiz-next]')) {
+      if (quizPage < QUIZ_PAGES.length - 1) { quizPage += 1; renderQuiz(); } else { closeQuiz(); }
+      return;
+    }
     const ans = e.target.closest('button[data-a]');
     if (ans) {
       state.answers[ans.dataset.a] = ans.dataset.v === 'yes';
