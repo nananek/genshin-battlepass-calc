@@ -54,7 +54,7 @@ const allPlan = Object.fromEntries(SEASON.map(m => [m.id, { status: 'plan' }]));
 section('data');
 eq('daily total', dailyTotal, 695);
 eq('weekly total', weeklyTotal, 6795);
-eq('season total', seasonTotal, 16800); // 聖霊紀行のスナップショット。シーズン更新時に見直す。
+eq('season total', seasonTotal, 19800); // 聖霊紀行のスナップショット。シーズン更新時に見直す。
 const allIds = [...DAILY, ...WEEKLY, ...SEASON].map(m => m.id);
 ok('unique ids', new Set(allIds).size === allIds.length);
 ok('season end after start', parseJst(data.season.end) > parseJst(data.season.start));

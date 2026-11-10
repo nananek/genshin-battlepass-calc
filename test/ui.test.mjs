@@ -172,11 +172,13 @@ ok('螺旋いいえで戻る', text('#seasonTotals').includes('やる0件'), tex
 
 console.log('\n# season table');
 const rows = seasonRows();
-ok('every season mission listed', rows.length === 11, String(rows.length));
+ok('every season mission listed', rows.length === 13, String(rows.length));
 ok('events come first', rows[0].textContent.includes('全域防衛'), rows[0].textContent.slice(0, 30));
+ok('undisclosed missions are masked', rows.filter(tr => tr.textContent.includes('???')).length === 2,
+  rows.map(tr => tr.querySelector('.m-name').textContent.trim()).join(' / '));
 ok('mora-free order matches the data file', (() => {
   const cats = rows.map(tr => tr.querySelector('.badge')?.textContent.trim());
-  return cats.join(',') === 'イベント,イベント,イベント,イベント,常設,常設,常設,常設,高難度,高難度,高難度';
+  return cats.join(',') === 'イベント,イベント,イベント,イベント,イベント,イベント,常設,常設,常設,常設,高難度,高難度,高難度';
 })(), rows.map(tr => tr.querySelector('.badge')?.textContent.trim()).join(','));
 ok('幽境 is above 螺旋 and シアター', (() => {
   const i = (kw) => rows.findIndex(tr => tr.textContent.includes(kw));
