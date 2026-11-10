@@ -276,6 +276,7 @@ const planSeason = text('#seasonTotals');
 const planWeekPool = /ウィークリー ([\d,]+)/.exec(budget()[0])?.[1];
 $('#shareBtn').click();
 const hash = window.location.hash;
+ok('share lives in the fixed bar', $('#shareBtn').closest('.landing') !== null);
 ok('share writes the plan into the hash', /^#p=[A-Za-z0-9_-]+$/.test(hash), hash.slice(0, 24));
 
 // 同じURLを開いた別ページで復元できるか

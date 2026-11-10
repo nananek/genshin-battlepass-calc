@@ -517,6 +517,7 @@
       <div class="landing-side">
         <div><span>${ok ? '余り' : '不足'}</span><b class="${ok ? 'good' : 'bad'}">${num(ok ? d.surplus : d.deficit)} EXP</b></div>
         <div><span>シーズン任務を除くと</span><b>Lv ${noSeasonLevel}</b></div>
+        <button type="button" class="share-btn" id="shareBtn" data-share>共有</button>
       </div>
       ${notes.length ? `<div class="notes">${notes.join('')}</div>` : ''}`;
   }
@@ -759,11 +760,15 @@
       const url = location.origin + location.pathname + '#p=' + code;
       try { history.replaceState(null, '', '#p=' + code); } catch (_) {}
       const ok = copyText(url);
-      const el = $('#shareState');
-      if (el) {
-        el.textContent = ok ? 'コピーした' : 'URLを出した';
-        clearTimeout(el._t);
-        el._t = setTimeout(() => { el.textContent = ''; }, 2600);
+      const btn = e.target.closest('[data-share]');
+      if (btn) {
+        btn.textContent = ok ? 'コピーした' : 'URLを出した';
+        btn.classList.add('done');
+        clearTimeout(btn._t);
+        btn._t = setTimeout(() => {
+          btn.textContent = '共有';
+          btn.classList.remove('done');
+        }, 2600);
       }
       return;
     }
