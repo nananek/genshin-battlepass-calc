@@ -72,6 +72,7 @@ const quizOn = (key) => {
   return btns[0].classList.contains('on');
 };
 const seasonRows = () => all('#seasonRows tr');
+const countdown = () => $('#countdown .big').textContent.trim();
 const rowId = (tr) => tr.querySelector('button[data-s]').dataset.s;
 
 let pass = 0;
@@ -95,6 +96,8 @@ ok('no step navigation', all('[data-nav]').length === 0);
 ok('no per-field description text', all('.desc').length === 0);
 ok('no slider duplicate', all('input[type="range"]').length === 0);
 ok('no level purchase', !['main', '.landing', '.modal'].map(sel => text(sel)).join(' ').includes('Lv購入'));
+ok('countdown reads days and hours', /^残り \d+日 \d+時間$/.test(countdown()), countdown());
+ok('countdown has no decimal', !countdown().includes('.'), countdown());
 
 console.log('\n# layout');
 ok('landing bar sits outside main', $('#resultPanel').closest('main') === null && $('#resultPanel').closest('.landing') !== null);

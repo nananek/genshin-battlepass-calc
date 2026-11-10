@@ -2,6 +2,7 @@
   'use strict';
 
   const DAY = 86400000;
+  const HOUR = 3600000;
   const TZ = 9 * 3600000;
   const RESET_HOUR = 5; // アジアサーバーの04:00リセット = JST 05:00
   const WEEK_CAP = 10000;
@@ -490,10 +491,12 @@
       el.innerHTML = '<span class="big">シーズン終了</span>';
       return;
     }
-    const leftDays = Math.max(0, (d.endMs - d.nowMs) / DAY);
+    const leftMs = Math.max(0, d.endMs - d.nowMs);
+    const leftDays = Math.floor(leftMs / DAY);
+    const leftHours = Math.floor((leftMs % DAY) / HOUR);
     const resetIn = Math.max(0, daysUntil(weekStart(d.nowMs) + 7 * DAY, d.nowMs));
     el.innerHTML = `
-      <span class="big">残り ${leftDays.toFixed(1)} 日</span>
+      <span class="big">残り ${leftDays}日 ${leftHours}時間</span>
       <span class="small">週の切り替えまで ${resetIn} 日</span>`;
   }
 
