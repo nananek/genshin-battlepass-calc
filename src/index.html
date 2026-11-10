@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>紀行プランナー | {{SEASON_NAME}}</title>
+<style>
+/*__STYLE__*/
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <p class="kicker">Genshin Impact / Battle Pass Planner</p>
+    <h1>紀行プランナー</h1>
+    <p class="season-line">シーズン{{SEASON_ID}} <strong>{{SEASON_NAME}}</strong> ／ {{SEASON_START}} 〜 <strong>{{SEASON_END}}</strong></p>
+    <div class="countdown" id="countdown"></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="summary" id="summaryCards" aria-label="現状サマリー"></section>
+
+  <div class="layout">
+    <div class="col">
+      <!-- 今週 -->
+      <section class="panel" id="weekPanel" aria-labelledby="weekPanelTitle">
+        <div class="panel-head">
+          <h2 id="weekPanelTitle">今週の消化</h2>
+          <span class="hint">月曜 05:00 リセット / 上限 10,000</span>
+        </div>
+        <div class="week-input">
+          <div class="field">
+            <label for="weekEarned">今週すでに獲得した経験値</label>
+            <input class="num" id="weekEarned" type="number" min="0" max="10000" step="1" data-bind="weekEarned">
+            <input class="range" id="weekEarnedRange" type="range" min="0" max="10000" step="10">
+            <div class="desc">紀行画面の「今週の獲得経験値」をそのまま。済の任務分も含める。</div>
+          </div>
+          <label class="check">
+            <input type="checkbox" data-bind="todayDone">
+            <span>今日のデイリーは消化済み<small>残りのデイリー計算から今日の分を除く</small></span>
+          </label>
+        </div>
+        <div class="panel-body" id="weekBody"></div>
+      </section>
+
+      <!-- ウィークリー -->
+      <section class="panel" aria-labelledby="weeklyTitle">
+        <div class="panel-head">
+          <h2 id="weeklyTitle">ウィークリー任務</h2>
+          <span class="hint" id="weeklyHint"></span>
+        </div>
+        <div class="panel-body">
+          <div class="toolbar">
+            <button class="btn green" data-act="week-all-done">今週を全部「済」</button>
+            <button class="btn gold" data-act="week-all-plan">今週を全部「予定」</button>
+            <button class="btn" data-act="week-clear">今週をクリア</button>
+            <span style="flex:1"></span>
+            <button class="btn gold" data-act="future-all">来週以降を全部やる</button>
+            <button class="btn" data-act="future-none">来週以降をクリア</button>
+          </div>
+          <div class="table-wrap">
+            <table class="responsive">
+              <thead>
+                <tr>
+                  <th>任務</th>
+                  <th class="exp">紀行経験</th>
+                  <th>今週</th>
+                  <th>来週以降</th>
+                </tr>
+              </thead>
+              <tbody id="weeklyRows"></tbody>
+            </table>
+          </div>
+          <div class="totals" id="weeklyTotals"></div>
+        </div>
+        <details>
+          <summary>デイリー任務の前提（既定は全部やる）</summary>
+          <div class="details-body" id="dailyBox"></div>
+        </details>
+      </section>
+
+      <!-- シーズン -->
+      <section class="panel" aria-labelledby="seasonTitle">
+        <div class="panel-head">
+          <h2 id="seasonTitle">シーズン任務</h2>
+          <span class="hint">週上限の対象外</span>
+        </div>
+        <div class="panel-body">
+          <p class="note blue" style="margin-top:0">
+            「済」は現在の紀行Lvに反映済みとして扱います。ここで数え直すのは「予定」だけです。
+            期限はゲーム内の終了時刻。イベント任務は追加されることがあるため、下のフォームから足せます。
+          </p>
+          <div class="table-wrap">
+            <table class="responsive">
+              <thead>
+                <tr>
+                  <th>任務</th>
+                  <th class="exp">紀行経験</th>
+                  <th>期限</th>
+                  <th>状態</th>
+                </tr>
+              </thead>
+              <tbody id="seasonRows"></tbody>
+            </table>
+          </div>
+          <div class="totals" id="seasonTotals"></div>
+          <form id="customForm" class="toolbar" style="margin-top:12px">
+            <input id="customName" type="text" placeholder="任務名（例：新しいイベント任務）" class="text-input" style="flex:1;min-width:180px" maxlength="120">
+            <input id="customExp" type="number" min="1" max="9999" step="1" placeholder="経験値" class="text-input" style="width:100px">
+            <button class="btn gold" type="submit">追加</button>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <div class="col">
+      <!-- 設定 -->
+      <section class="panel" aria-labelledby="settingsTitle">
+        <div class="panel-head">
+          <h2 id="settingsTitle">設定</h2>
+          <span class="save-state" id="saveState"></span>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <label for="target">目標Lv</label>
+            <input class="num" id="target" type="number" min="1" max="50" step="1" data-bind="target">
+            <div class="desc">Lv50が上限。Lv30で紀行宝匣。</div>
+          </div>
+          <div class="field">
+            <label for="level">現在の紀行Lv</label>
+            <input class="num" id="level" type="number" min="1" max="50" step="1" data-bind="level">
+          </div>
+          <div class="field">
+            <label for="exp">現在のLv内経験値</label>
+            <input class="num" id="exp" type="number" min="0" max="999" step="1" data-bind="exp">
+            <div class="desc">ゲーム内の「紀行経験 x,xxx / 1,000」の分子。</div>
+          </div>
+          <div class="field">
+            <label for="playDays">今後、週にプレイする日数</label>
+            <input class="num" id="playDays" type="number" min="1" max="7" step="1" data-bind="playDays">
+            <div class="desc">デイリーを全部やる日。週の残り日数にも適用。</div>
+          </div>
+          <div class="field">
+            <label for="ar">冒険ランク（目安）</label>
+            <input class="num" id="ar" type="number" min="20" max="60" step="1" data-bind="ar">
+            <div class="desc">AR28/32で一部のウィークリーが解禁。</div>
+          </div>
+          <div class="field">
+            <label for="tier">購入プラン</label>
+            <select id="tier" data-bind="tier">
+              <option value="earth">大地紀行（無料）</option>
+              <option value="sky">天空紀行（¥1,220）</option>
+              <option value="shinju">真珠の歌（¥2,440）</option>
+            </select>
+          </div>
+          <label class="check" id="pearlRow">
+            <input type="checkbox" data-bind="pearlPending">
+            <span>真珠の歌の「Lv+10」をまだ受け取っていない<small>選択すると +10,000 EXP を加算</small></span>
+          </label>
+          <details>
+            <summary>シーズン日時・基準日時</summary>
+            <div class="details-body">
+              <div class="field">
+                <label for="seasonEnd">シーズン終了日時（JST）</label>
+                <input id="seasonEnd" type="datetime-local" data-bind="seasonEnd" class="text-input">
+              </div>
+              <div class="field">
+                <label for="nowOverride">基準日時（JST・空なら現在）</label>
+                <input id="nowOverride" type="datetime-local" data-bind="nowOverride" class="text-input">
+              </div>
+              <button class="btn" type="button" data-act="now-clear" style="margin-top:8px">基準日時を現在に戻す</button>
+            </div>
+          </details>
+          <div class="toolbar" style="margin:14px 0 0">
+            <button class="btn" data-act="reset">プランをリセット</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 判定 -->
+      <section class="panel" aria-labelledby="resultTitle">
+        <div class="panel-head">
+          <h2 id="resultTitle">この計画の着地</h2>
+        </div>
+        <div id="resultPanel"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- タイムライン -->
+  <section class="panel" style="margin-top:18px" aria-labelledby="timelineTitle">
+    <div class="panel-head">
+      <h2 id="timelineTitle">週別タイムライン</h2>
+      <span class="hint" id="timelineHint"></span>
+    </div>
+    <div class="table-wrap">
+      <table class="timeline-table">
+        <thead>
+          <tr>
+            <th>週</th>
+            <th class="num">デイリー</th>
+            <th class="num">ウィークリー</th>
+            <th class="num">加算（上限後）</th>
+            <th class="num">シーズン</th>
+            <th class="num">週合計</th>
+            <th class="num">累計</th>
+            <th class="num">Lv</th>
+          </tr>
+        </thead>
+        <tbody id="timelineRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 前提 -->
+  <section class="panel footer" style="margin-top:18px">
+    <div class="panel-head"><h2>データと前提</h2><span class="hint">{{VERIFIED}} 時点</span></div>
+    <div class="panel-body">
+      <h3>計算ルール</h3>
+      <ul>
+        <li>紀行経験 1,000 = 紀行Lv+1。Lv50まで（必要経験値は合計 49,000）。</li>
+        <li>デイリー＋ウィークリーは月曜 05:00（JST）からの1週間で <b>10,000</b> まで。超過分は加算されない。アジアサーバーの04:00リセット（UTC+8）がJSTでは05:00になる。</li>
+        <li>シーズン任務（イベント任務を含む）は週上限の対象外。</li>
+        <li>デイリーは既定で4任務すべて（1日 695 EXP、週 4,865）。</li>
+        <li>真珠の歌の「Lv+10」は +10,000 EXP として扱う。</li>
+        <li>Lv購入は 原石 150 / Lv（1Lv = 1,000 EXP）。Lv50を超えては買えない。</li>
+      </ul>
+
+      <h3>データの出典と注意</h3>
+      <ul>
+        <li>デイリー・ウィークリー・報酬は <a href="https://wikiwiki.jp/genshinwiki/%E7%B4%80%E8%A1%8C" target="_blank" rel="noopener">原神Wiki「紀行」</a>（{{SOURCE_UPDATED}} 更新）を基準にした。</li>
+        <li>ウィークリーの合計は <b>6,795</b>。Wiki本文の「7,695」は Ver.5.0 で「住民リクエスト」「討伐懸賞」が削除される前の値で、現在の表の任務を足すと 6,795 になる。</li>
+        <li>ウィークリーの回数は 秘境10回 / 地脈の花芽15回（Luna I の回数緩和後）。経験値はどちらも450で変わらない。</li>
+        <li>{{SEASON_NAME}}のシーズン任務は、紀行ページと各イベントページ（全域防衛・幽境の激戦）から拾った判明分。イベント任務は後から追加されることがある。</li>
+        <li>幽境の激戦「激戦の功勲1,200」は地脈活動期（11/11 11:00〜11/21 04:59）に樹脂を使う必要があるため、期限を11/21にしている。</li>
+        <li>幻想シアターの第8幕は12/1開放。深境螺旋は11/16以降の期でもよい。</li>
+        <li>購入プランの価格・Lv購入の原石数はゲーム内表記に合わせた。原石と創世結晶の区別が曖昧な情報があるため、購入前にゲーム内で確認すること。</li>
+      </ul>
+
+      <h3>使い方</h3>
+      <ul>
+        <li>まず「今週すでに獲得した経験値」を入れる。紀行画面の週間ゲージの値。</li>
+        <li>ウィークリーの「今週」を 済 / 予定 / なし で埋める。「来週以降」は毎週やるものだけON。</li>
+        <li>「来週以降」は全週共通のセット。週ごとの例外は、その週に入ったら「今週」を更新して調整する。</li>
+        <li>シーズン任務は、終わったものを「済」、やるつもりのものを「予定」にする。</li>
+        <li>右の「この計画の着地」で、目標に届くか、いつ届くか、何Lv買えばよいかを見る。</li>
+        <li>入力はブラウザに自動保存される。別端末とは共有されない。</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<script>
+window.__BP_DATA__ = /*__DATA__*/;
+/*__APP__*/
+</script>
+</body>
+</html>
