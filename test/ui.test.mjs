@@ -41,12 +41,16 @@ const heroLevel = () => {
   const m = /Lv (\d+)/.exec(text('#resultPanel'));
   return m ? Number(m[1]) : null;
 };
-const kvLine = (label) => {
-  const k = all('#resultPanel .kv .k').find(el => el.textContent.trim() === label);
-  return k ? k.nextElementSibling.textContent.replace(/\s+/g, ' ').trim() : '';
+const landingValue = (label) => {
+  const k = all('#resultPanel .landing-side span').find(el => el.textContent.trim() === label);
+  return k && k.nextElementSibling ? k.nextElementSibling.textContent.replace(/\s+/g, ' ').trim() : '';
 };
+const panelOrder = () => all('main .panel-head h2').map(el => el.textContent.trim());
 const weekDays = () => Number(/（(\d)日）/.exec(all('#timelineRows tr')[0].textContent)?.[1]);
 const seg = (id, v) => document.querySelector(`button[data-s="${id}"][data-v="${v}"]`);
+const wseg = (id, v) => document.querySelector(`button[data-w="${id}"][data-v="${v}"]`);
+const futureBox = (id) => document.querySelector(`input[data-future="${id}"]`);
+const budget = () => all('#weeklyBudget .budget').map(p => p.textContent.replace(/\s+/g, ' ').trim());
 
 let pass = 0;
 let fail = 0;
@@ -68,6 +72,14 @@ ok('no per-field description text', all('.desc').length === 0);
 ok('no slider duplicate', all('input[type="range"]').length === 0);
 ok('no level purchase', !document.body.textContent.includes('Lv購入'));
 
+console.log('\n# layout');
+ok('landing bar sits outside main', $('#resultPanel').closest('main') === null && $('#resultPanel').closest('.landing') !== null);
+ok('landing bar is labelled 計画着地点', text('#resultPanel').includes('計画着地点'), text('#resultPanel').slice(0, 30));
+ok('season comes before weekly', (() => {
+  const o = panelOrder();
+  return o.indexOf('シーズン任務') >= 0 && o.indexOf('シーズン任務') < o.indexOf('ウィークリー');
+})(), panelOrder().join(' / '));
+
 console.log('\n# inputs drive the projection');
 setInput('#nowOverride', '2026-12-10T12:00');
 setInput('#level', '12');
@@ -76,7 +88,7 @@ setInput('#weekEarned', '5200');
 const lv12 = heroLevel();
 ok('projection above the current level', lv12 > 12, String(lv12));
 ok('hero shows the target', text('#resultPanel').includes('/ 50'));
-ok('deficit shown as EXP', /[\d,]+ EXP/.test(kvLine('目標まで')), kvLine('目標まで'));
+ok('deficit shown as EXP', /[\d,]+ EXP/.test(landingValue('目標まで')), landingValue('目標まで'));
 
 setInput('#level', '20');
 ok('higher level raises the projection', heroLevel() > lv12, `${lv12} -> ${heroLevel()}`);
@@ -84,25 +96,41 @@ const lv20 = heroLevel();
 setInput('#level', '12');
 ok('lowering level restores it', heroLevel() === lv12, String(heroLevel()));
 
-console.log('\n# weekly: how much can be skipped');
-ok('budget states the room to skip', text('#weeklyBudget').includes('まで抜ける'), text('#weeklyBudget'));
-ok('budget value is 1,660', text('#weeklyBudget').includes('1,660'), text('#weeklyBudget'));
+console.log('\n# weekly: this week and next weeks');
+const budgetNow = budget();
+ok('two budget lines', budgetNow.length === 2, JSON.stringify(budgetNow));
+ok('this week line shows the room to skip', budgetNow[0].includes('今週は') && budgetNow[0].includes('まで抜ける'), budgetNow[0]);
+ok('next weeks line shows 1,660', budgetNow[1].includes('来週以降は') && budgetNow[1].includes('1,660'), budgetNow[1]);
 ok('all twelve weeklies listed', all('#weeklyRows tr').length === 12, String(all('#weeklyRows tr').length));
+ok('both columns exist', all('#weeklyRows tr')[0].querySelector('.seg') !== null && all('#weeklyRows tr')[0].querySelector('input[data-future]') !== null);
 
 const cheap = all('#weeklyRows tr').find(tr => tr.querySelector('td.exp').textContent.trim() === '450');
-const cheapKey = cheap.querySelector('input[data-skip]').dataset.skip;
-toggle(`input[data-skip="${cheapKey}"]`, true);
-ok('skipping one lowers the budget', text('#weeklyBudget').includes('1,210'), text('#weeklyBudget'));
-ok('one skip still fills the cap', !text('#weeklyBudget').includes('足りない') && heroLevel() === lv12, String(heroLevel()));
+const cheapId = cheap.querySelector('button[data-w]').dataset.w;
+const thisBefore = budget()[0];
+wseg(cheapId, 'none').click();
+ok('今週やらない lowers the this-week room', budget()[0] !== thisBefore && budget()[0].includes('まで抜ける') || budget()[0].includes('足りない'), budget()[0]);
+const thisAfter = budget()[0];
 
-const skipIds = all('input[data-skip]').map(el => el.dataset.skip);
-for (const id of skipIds) toggle(`input[data-skip="${id}"]`, true);
-ok('skipping everything goes negative', text('#weeklyBudget').includes('足りない') && text('#weeklyBudget').includes('5,135'), text('#weeklyBudget'));
-ok('skipping everything lowers the projection', heroLevel() < lv12, `${lv12} -> ${heroLevel()}`);
-ok('result warns about the shortfall', text('#resultPanel').includes('足りない'), text('#resultPanel').slice(-70));
+futureBox(cheapId).checked = false;
+fire(futureBox(cheapId), 'input');
+ok('来週以降を外すと来週以降が減る', budget()[1].includes('1,210'), budget()[1]);
+ok('今週の表示は変わらない', budget()[0] === thisAfter, budget()[0]);
+wseg(cheapId, 'done').click();
+ok('済は今週の枠から外れる', budget()[0].includes('まで抜ける') || budget()[0].includes('足りない'), budget()[0]);
 
-for (const id of skipIds) toggle(`input[data-skip="${id}"]`, false);
-ok('unskipping restores the projection', heroLevel() === lv12, String(heroLevel()));
+// 来週以降が効くのは先の週があるとき（12/10 だと今週しか残っていない）
+setInput('#nowOverride', '2026-11-10T19:27');
+const lvWithFuture = heroLevel();
+const futureIds = all('input[data-future]').map(el => el.dataset.future);
+for (const id of futureIds) { const el = futureBox(id); el.checked = false; fire(el, 'input'); }
+ok('来週以降を全部外すと足りない', budget()[1].includes('足りない') && budget()[1].includes('5,135'), budget()[1]);
+ok('来週以降を全部外すと着地点が下がる', heroLevel() < lvWithFuture, `${lvWithFuture} -> ${heroLevel()}`);
+ok('result warns about the shortfall', text('#resultPanel').includes('足りない'), text('#resultPanel').slice(-60));
+
+for (const id of futureIds) { const el = futureBox(id); el.checked = true; fire(el, 'input'); }
+ok('戻すと着地点も戻る', heroLevel() === lvWithFuture, String(heroLevel()));
+setInput('#nowOverride', '2026-12-10T12:00');
+ok('基準日時を戻すと着地点も戻る', heroLevel() === lv12, String(heroLevel()));
 
 console.log('\n# season: nothing planned by default');
 const rows = all('#seasonRows tr');

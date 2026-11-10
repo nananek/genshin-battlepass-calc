@@ -83,34 +83,6 @@
     </details>
   </section>
 
-  <section class="panel" aria-labelledby="resultTitle">
-    <div class="panel-head">
-      <h2 id="resultTitle">このままの見込み</h2>
-    </div>
-    <div id="resultPanel"></div>
-  </section>
-
-  <section class="panel" aria-labelledby="weeklyTitle">
-    <div class="panel-head">
-      <h2 id="weeklyTitle">ウィークリー</h2>
-    </div>
-    <div class="panel-body">
-      <p class="budget" id="weeklyBudget"></p>
-      <div class="table-wrap">
-        <table class="responsive">
-          <thead>
-            <tr>
-              <th>任務</th>
-              <th class="exp">紀行経験</th>
-              <th>抜く</th>
-            </tr>
-          </thead>
-          <tbody id="weeklyRows"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
   <section class="panel" aria-labelledby="seasonTitle">
     <div class="panel-head">
       <h2 id="seasonTitle">シーズン任務</h2>
@@ -128,6 +100,28 @@
         </thead>
         <tbody id="seasonRows"></tbody>
       </table>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="weeklyTitle">
+    <div class="panel-head">
+      <h2 id="weeklyTitle">ウィークリー</h2>
+    </div>
+    <div class="panel-body">
+      <p class="budget" id="weeklyBudget"></p>
+      <div class="table-wrap">
+        <table class="responsive">
+          <thead>
+            <tr>
+              <th>任務</th>
+              <th class="exp">紀行経験</th>
+              <th>今週</th>
+              <th>来週以降</th>
+            </tr>
+          </thead>
+          <tbody id="weeklyRows"></tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -160,7 +154,7 @@
       <ul>
         <li>紀行経験1,000でLv+1。Lv50が上限。</li>
         <li>デイリー4件（1日695 EXP）を毎日やる前提。</li>
-        <li>ウィークリーは「抜く」を付けた任務以外を毎週やる前提。デイリーと合わせて週10,000 EXPまで加算され、超えた分は加算されない。</li>
+        <li>ウィークリーは「今週」が済かやるの分を今週に、「来週以降」にチェックした分を毎週加算する。デイリーと合わせて週10,000 EXPまでで、超えた分は加算されない。</li>
         <li>シーズン任務は週上限の対象外。期限を過ぎた任務は加算しない。</li>
         <li>真珠の歌の「Lv+10」は10,000 EXPとして扱う。</li>
       </ul>
@@ -172,6 +166,10 @@
     </div>
   </details>
 </main>
+
+<div class="landing" aria-live="polite">
+  <div class="landing-inner" id="resultPanel"></div>
+</div>
 
 <script>
 window.__BP_DATA__ = /*__DATA__*/;

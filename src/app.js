@@ -31,7 +31,7 @@
     pearlPending: false,
     seasonEnd: SEASON_META.end,
     nowOverride: '',
-    weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { skip: false }])),
+    weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'plan', future: true }])),
     season: Object.fromEntries(SEASON.map(m => [m.id, { status: 'none' }])),
   };
 
@@ -98,9 +98,12 @@
 
     const targetTotal = (state.target - 1) * LEVEL_EXP;
     const pearlBonus = state.tier === 'shinju' && state.pearlPending ? 10000 : 0;
-    const arMax = WEEKLY.reduce((s, m) => s + (m.ar <= state.ar ? m.exp : 0), 0);
-    const weeklyPool = WEEKLY.reduce(
-      (s, m) => s + (m.ar <= state.ar && !state.weekly[m.id]?.skip ? m.exp : 0), 0);
+    const wOf = (id) => state.weekly[id] || {};
+    const sumW = (pred) => WEEKLY.reduce((s, m) => s + (m.ar <= state.ar && pred(m) ? m.exp : 0), 0);
+    const arMax = sumW(() => true);
+    const thisWeekPool = sumW(m => wOf(m.id).thisWeek === 'plan');
+    const nextWeekPool = sumW(m => wOf(m.id).future === true);
+    const doneThisWeek = sumW(m => wOf(m.id).thisWeek === 'done');
     let total = (state.level - 1) * LEVEL_EXP + state.exp + pearlBonus;
 
     const missions = missionsOf(state);
@@ -130,7 +133,7 @@
       const isCurrent = ws === weekStart(nowMs);
       const days = usableDays(ws, nowMs, endMs, state.todayDone);
       const rawDaily = DAILY_EXP * days.length;
-      const rawWeekly = days.length ? weeklyPool : 0;
+      const rawWeekly = days.length ? (isCurrent ? thisWeekPool : nextWeekPool) : 0;
       const startUsed = isCurrent ? Math.min(WEEK_CAP, Math.max(0, state.weekEarned)) : 0;
       const room = Math.max(0, WEEK_CAP - startUsed);
       const raw = rawDaily + rawWeekly;
@@ -180,17 +183,22 @@
     const projectedLevel = Math.min(MAX_LEVEL, Math.floor(total / LEVEL_EXP) + 1);
     const deficit = Math.max(0, targetTotal - total);
 
-    const weeklyFull = Math.min(WEEK_CAP, DAILY_EXP * 7 + weeklyPool);
+    const weeklyFull = Math.min(WEEK_CAP, DAILY_EXP * 7 + nextWeekPool);
     const weeklyNeeded = Math.max(0, WEEK_CAP - DAILY_EXP * 7);
+    const current = weeks[0] || null;
+    const weekRoom = current ? Math.max(0, WEEK_CAP - Math.min(WEEK_CAP, Math.max(0, state.weekEarned))) : 0;
+    const thisWeekNeed = Math.max(0, weekRoom - (current ? current.rawDaily : 0));
 
     return {
-      nowMs, endMs, targetTotal, pearlBonus, arMax, weeklyPool, weeklyNeeded, dailyExp: DAILY_EXP,
+      nowMs, endMs, targetTotal, pearlBonus, arMax, weeklyNeeded, dailyExp: DAILY_EXP,
+      thisWeekPool, nextWeekPool, doneThisWeek, weekRoom, thisWeekNeed,
+      thisWeekBudget: thisWeekPool - thisWeekNeed,
+      nextWeekBudget: nextWeekPool - weeklyNeeded,
       total, totalNoSeason: total - plannedSeasonExp, projectedLevel,
       weeks, reached, totalOverflow,
       missions, planned, plannedSeasonExp, expired,
       deficit,
-      weeklyFull, weeklyShort: Math.max(0, WEEK_CAP - (DAILY_EXP * 7 + weeklyPool)),
-      skipBudget: weeklyPool - Math.max(0, WEEK_CAP - DAILY_EXP * 7),
+      weeklyFull, weeklyShort: Math.max(0, WEEK_CAP - (DAILY_EXP * 7 + nextWeekPool)),
       currentWeek: weeks[0] || null,
     };
   }
@@ -213,7 +221,11 @@
       if (k === 'weekly') {
         if (saved.weekly && typeof saved.weekly === 'object') {
           for (const id of Object.keys(def.weekly)) {
-            if (typeof saved.weekly[id]?.skip === 'boolean') out.weekly[id] = { skip: saved.weekly[id].skip };
+            const v = saved.weekly[id];
+            if (!v) continue;
+            const thisWeek = ['done', 'plan', 'none'].includes(v.thisWeek) ? v.thisWeek : def.weekly[id].thisWeek;
+            const future = typeof v.future === 'boolean' ? v.future : def.weekly[id].future;
+            out.weekly[id] = { thisWeek, future };
           }
         }
       } else if (k === 'season') {
@@ -281,46 +293,59 @@
 
     const notes = [];
     if (d.weeklyShort > 0) {
-      notes.push(`<p class="note gold">ウィークリーの選択では週 ${num(d.weeklyPool)} EXP まで。デイリー7日分と合わせても週上限には ${num(d.weeklyShort)} EXP 足りない。</p>`);
+      notes.push(`<p class="note gold">来週以降に残すウィークリーは週 ${num(d.nextWeekPool)} EXP。デイリー7日分と合わせても週上限には ${num(d.weeklyShort)} EXP 足りない。</p>`);
     }
     if (d.expired.length > 0) {
       notes.push(`<p class="note red">期限切れの任務が${d.expired.length}件ある。見込みには加えていない。</p>`);
     }
 
     $('#resultPanel').innerHTML = `
-      <div class="result-hero">
-        <div class="big">Lv ${d.projectedLevel}<small> / ${state.target}</small></div>
+      <div class="landing-now">
+        <div class="big"><span class="cap">計画着地点</span> Lv ${d.projectedLevel}<small> / ${state.target}</small></div>
         <div class="sub">${reachedText}</div>
       </div>
-      <div class="kv">
-        <div class="k">目標まで</div>
-        <div class="v ${ok ? 'good' : 'bad'}">${ok ? '到達済み' : `${num(d.deficit)} EXP`}</div>
-        <div class="k">シーズン任務を除くと</div>
-        <div class="v">Lv ${noSeasonLevel}</div>
+      <div class="landing-side">
+        <div><span>目標まで</span><b class="${ok ? 'good' : 'bad'}">${ok ? '到達済み' : `${num(d.deficit)} EXP`}</b></div>
+        <div><span>シーズン任務を除くと</span><b>Lv ${noSeasonLevel}</b></div>
       </div>
       ${notes.length ? `<div class="notes">${notes.join('')}</div>` : ''}`;
   }
 
   function renderWeekly(d) {
     $('#weeklyRows').innerHTML = WEEKLY.map(m => {
-      const skip = !!state.weekly[m.id]?.skip;
+      const st = state.weekly[m.id] || {};
+      const tw = st.thisWeek || 'none';
       const locked = m.ar > state.ar;
       const badge = m.ar > 20 ? `<span class="badge ar">AR${m.ar}〜</span>` : '';
-      return `<tr class="${skip || locked ? 'off' : ''}">
+      return `<tr class="${locked ? 'off' : ''}">
         <td data-label="任務"><span class="m-name">${esc(m.name)}</span> ${badge}</td>
         <td class="exp" data-label="紀行経験">${num(m.exp)}</td>
-        <td data-label="抜く">
-          <label class="chk"><input type="checkbox" data-skip="${m.id}" ${skip ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>抜く</span></label>
+        <td data-label="今週">
+          <div class="seg">
+            <button type="button" data-w="${m.id}" data-v="done" class="${tw === 'done' ? 'on done' : ''}">済</button>
+            <button type="button" data-w="${m.id}" data-v="plan" class="${tw === 'plan' ? 'on plan' : ''}">やる</button>
+            <button type="button" data-w="${m.id}" data-v="none" class="${tw === 'none' ? 'on none' : ''}">やらない</button>
+          </div>
+        </td>
+        <td data-label="来週以降">
+          <label class="chk"><input type="checkbox" data-future="${m.id}" ${st.future ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>毎週</span></label>
         </td>
       </tr>`;
     }).join('');
 
-    const ok = d.skipBudget >= 0;
-    $('#weeklyBudget').className = 'budget ' + (ok ? 'ok' : 'bad');
-    const basis = `<span>必要 ${num(d.weeklyNeeded)} ／ 全部 ${num(d.arMax)}</span>`;
-    $('#weeklyBudget').innerHTML = ok
-      ? `あと <b>${num(d.skipBudget)}</b> EXP まで抜ける${basis}`
-      : `<b>${num(-d.skipBudget)}</b> EXP 足りない${basis}`;
+    const line = (label, budget, basis) => {
+      const ok = budget >= 0;
+      return `<p class="budget ${ok ? 'ok' : 'bad'}">${label}あと <b>${num(budget)}</b> EXP まで抜ける<span>${basis}</span></p>`;
+    };
+    const short = (label, budget, basis) =>
+      `<p class="budget bad">${label} <b>${num(-budget)}</b> EXP 足りない<span>${basis}</span></p>`;
+
+    const thisBasis = `残り枠 ${num(d.weekRoom)} ／ 残りデイリー ${num(d.currentWeek ? d.currentWeek.rawDaily : 0)} ／ 今週やる ${num(d.thisWeekPool)}`;
+    const nextBasis = `必要 ${num(d.weeklyNeeded)} ／ 毎週残す ${num(d.nextWeekPool)} ／ 全部 ${num(d.arMax)}`;
+
+    $('#weeklyBudget').innerHTML =
+      (d.thisWeekBudget >= 0 ? line('今週は', d.thisWeekBudget, thisBasis) : short('今週は', d.thisWeekBudget, thisBasis)) +
+      (d.nextWeekBudget >= 0 ? line('来週以降は', d.nextWeekBudget, nextBasis) : short('来週以降は', d.nextWeekBudget, nextBasis));
   }
 
   function renderSeason(d) {
@@ -417,14 +442,22 @@
   });
 
   document.addEventListener('input', (e) => {
-    const id = e.target.dataset?.skip;
+    const id = e.target.dataset?.future;
     if (!id) return;
-    state.weekly[id] = { skip: e.target.checked };
+    state.weekly[id] = { ...(state.weekly[id] || {}), future: e.target.checked };
     save();
     render();
   });
 
   document.addEventListener('click', (e) => {
+    const w = e.target.closest('button[data-w]');
+    if (w) {
+      const id = w.dataset.w;
+      state.weekly[id] = { ...(state.weekly[id] || {}), thisWeek: w.dataset.v };
+      save();
+      render();
+      return;
+    }
     const b = e.target.closest('button[data-s]');
     if (!b) return;
     const id = b.dataset.s;

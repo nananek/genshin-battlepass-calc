@@ -48,7 +48,7 @@ const base = {
   pearlPending: false,
   seasonEnd: data.season.end,
   nowOverride: NOW,
-  weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { skip: false }])),
+  weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'plan', future: true }])),
   season: Object.fromEntries(SEASON.map(m => [m.id, { status: 'none' }])),
 };
 const allPlan = Object.fromEntries(SEASON.map(m => [m.id, { status: 'plan' }]));
@@ -128,20 +128,38 @@ const reachedTarget = compute({ ...base, target: 2, level: 3 });
 eq('reached target has no deficit', reachedTarget.deficit, 0);
 ok('reached date set', reachedTarget.reached !== null, String(reachedTarget.reached));
 
-section('weekly skip');
+section('weekly: this week vs next weeks');
 const weeklyNeeded = 10000 - dailyTotal * 7;
+eq('this week pool', d0.thisWeekPool, weeklyTotal);
+eq('next week pool', d0.nextWeekPool, weeklyTotal);
+eq('current week uses this week', d0.weeks[0].rawWeekly, d0.thisWeekPool);
+eq('later weeks use next weeks', d0.weeks[1].rawWeekly, d0.nextWeekPool);
 eq('needed from weeklies', d0.weeklyNeeded, weeklyNeeded);
-eq('whole pool leaves room to skip', d0.skipBudget, weeklyTotal - weeklyNeeded);
-const noWeeklies = Object.fromEntries(WEEKLY.map(m => [m.id, { skip: true }]));
-const skippedAll = compute({ ...base, weekly: noWeeklies });
-eq('skipping all removes the weekly exp', skippedAll.weeklyPool, 0);
-eq('skipping all caps a full week at dailies', skippedAll.weeks[1].applied, dailyTotal * 7);
-eq('skipping all goes negative', skippedAll.skipBudget, -weeklyNeeded);
-const cheap = WEEKLY.filter(m => m.exp <= 450).slice(0, 1)[0];
-const oneSkip = compute({ ...base, weekly: { ...base.weekly, [cheap.id]: { skip: true } } });
-eq('one skip lowers the budget', oneSkip.skipBudget, weeklyTotal - cheap.exp - weeklyNeeded);
-ok('one skip is affordable', oneSkip.skipBudget >= 0, String(oneSkip.skipBudget));
-ok('one skip does not lower a full week', oneSkip.weeks[1].applied === 10000);
+eq('room to skip next weeks', d0.nextWeekBudget, weeklyTotal - weeklyNeeded);
+
+const noneBoth = Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'none', future: false }]));
+const dropped = compute({ ...base, weekly: noneBoth });
+eq('dropping everything removes the weekly exp', dropped.thisWeekPool + dropped.nextWeekPool, 0);
+eq('dropping everything caps a full week at dailies', dropped.weeks[1].applied, dailyTotal * 7);
+eq('dropping everything goes negative', dropped.nextWeekBudget, -weeklyNeeded);
+
+const oneDone = Object.fromEntries(WEEKLY.map(m => [m.id, {
+  thisWeek: m.id === WEEKLY[0].id ? 'done' : 'plan',
+  future: true,
+}]));
+const doneOne = compute({ ...base, weekly: oneDone });
+eq('done stays out of this week pool', doneOne.thisWeekPool, weeklyTotal - WEEKLY[0].exp);
+eq('done is reported separately', doneOne.doneThisWeek, WEEKLY[0].exp);
+eq('done does not change next weeks', doneOne.nextWeekPool, weeklyTotal);
+
+section('weekly: this week room');
+const earned = compute({ ...base, weekEarned: 8000 });
+eq('this week need after 8000 earned', earned.thisWeekNeed,
+  Math.max(0, 2000 - earned.weeks[0].rawDaily));
+eq('this week budget follows the room', earned.thisWeekBudget, earned.thisWeekPool - earned.thisWeekNeed);
+const noFuture = compute({ ...base, weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'plan', future: false }])) });
+eq('future off leaves this week alone', noFuture.weeks[0].rawWeekly, weeklyTotal);
+eq('future off lowers later weeks', noFuture.weeks[1].rawWeekly, 0);
 
 section('past season');
 const past = compute({ ...base, seasonEnd: '2026-11-09T04:59' });
