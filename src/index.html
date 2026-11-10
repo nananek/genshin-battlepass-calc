@@ -43,6 +43,18 @@
           <b>/ 10,000</b>
         </label>
       </div>
+      <div class="tier-row">
+        <label for="tier">購入プラン</label>
+        <select id="tier" data-bind="tier">
+          <option value="earth">大地紀行（無料）</option>
+          <option value="sky">天空紀行（¥1,220）</option>
+          <option value="shinju">真珠の歌（¥2,440）</option>
+        </select>
+      </div>
+      <label class="check" id="pearlRow">
+        <input type="checkbox" data-bind="pearlNotBought">
+        <span>真珠の歌をまだ買っていない</span>
+      </label>
       <label class="check">
         <input type="checkbox" data-bind="todayDone">
         <span>今日のデイリーを消化済み</span>
@@ -59,18 +71,6 @@
           <label for="ar">冒険ランク</label>
           <input class="num" id="ar" type="number" inputmode="numeric" min="20" max="60" step="1" data-bind="ar">
         </div>
-        <div class="field">
-          <label for="tier">購入プラン</label>
-          <select id="tier" data-bind="tier">
-            <option value="earth">大地紀行（無料）</option>
-            <option value="sky">天空紀行（¥1,220）</option>
-            <option value="shinju">真珠の歌（¥2,440）</option>
-          </select>
-        </div>
-        <label class="check" id="pearlRow">
-          <input type="checkbox" data-bind="pearlPending">
-          <span>真珠の歌のLv+10を受け取っていない</span>
-        </label>
         <div class="field">
           <label for="seasonEnd">シーズン終了日時</label>
           <input class="text-input" id="seasonEnd" type="datetime-local" data-bind="seasonEnd">
@@ -143,7 +143,7 @@
         <li>デイリー4件（1日695 EXP）を毎日やる前提。</li>
         <li>ウィークリーは「今週」が済かやるの分を今週に、「来週以降」にチェックした分を毎週加算する。デイリーと合わせて週10,000 EXPまでで、超えた分は加算されない。</li>
         <li>シーズン任務は週上限の対象外。期限を過ぎた任務は加算しない。</li>
-        <li>真珠の歌の「Lv+10」は10,000 EXPとして扱う。</li>
+        <li>真珠の歌のLv+10は買った瞬間に入る。買った後は入力したLvに含まれているので、まだ買っていないときだけ10,000 EXPとして足す。</li>
       </ul>
       <ul>
         <li>データは<a href="https://wikiwiki.jp/genshinwiki/%E7%B4%80%E8%A1%8C" target="_blank" rel="noopener">原神Wiki「紀行」</a>（{{SOURCE_UPDATED}}更新）を基準にした。ウィークリーの合計は6,795 EXP。</li>

@@ -7,7 +7,7 @@
   const WEEK_CAP = 10000;
   const LEVEL_EXP = 1000;
   const MAX_LEVEL = 50;
-  const STORE_KEY = 'genshin-bp-planner-v2';
+  const STORE_KEY = 'genshin-bp-planner-v3';
 
   const DATA = window.__BP_DATA__;
   const SEASON_META = DATA.season;
@@ -28,7 +28,7 @@
     todayDone: false,
     ar: 60,
     tier: 'earth',
-    pearlPending: false,
+    pearlNotBought: false,
     seasonEnd: SEASON_META.end,
     nowOverride: '',
     weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'plan', future: true }])),
@@ -98,7 +98,8 @@
     if (!Number.isFinite(endMs)) endMs = parseJst(DEFAULT_STATE.seasonEnd);
 
     const targetTotal = (state.target - 1) * LEVEL_EXP;
-    const pearlBonus = state.tier === 'shinju' && state.pearlPending ? 10000 : 0;
+    // 真珠の歌のLv+10は購入した瞬間に入る。買った後は入力したLvに含まれているので足さない。
+    const pearlBonus = state.tier === 'shinju' && state.pearlNotBought ? 10000 : 0;
     let total = (state.level - 1) * LEVEL_EXP + state.exp + pearlBonus;
 
     const missions = missionsOf(state);
@@ -464,7 +465,7 @@
       const el = document.querySelectorAll(`[data-bind="${key}"]`);
       el.forEach(n => { n.value = state[key]; });
     }
-    for (const key of ['todayDone', 'pearlPending']) {
+    for (const key of ['todayDone', 'pearlNotBought']) {
       document.querySelectorAll(`[data-bind="${key}"]`).forEach(n => { n.checked = !!state[key]; });
     }
   }
