@@ -27,7 +27,14 @@
     { key: 'theater', q: '幻想シアターは?', art: 'curtain', def: false },
     { key: 'stygian', q: '幽境の激戦は?', art: 'swords', def: false },
     { key: 'artifacts', q: '聖遺物、強化する?', art: 'flower', def: true },
-    { key: 'pull', q: '今週だけモラをたくさん使う?', art: 'coin', def: false },
+    {
+      key: 'mora', q: 'モラを使う予定は?', art: 'coin', def: 'none',
+      choices: [
+        { v: 'once', label: '今週だけ（強化など）' },
+        { v: 'weekly', label: '毎週コツコツ50万ずつ' },
+        { v: 'none', label: 'モラがないのよ…貧乏なのよ…' },
+      ],
+    },
     { key: 'tcg', q: '七聖召喚は?', art: 'cards', def: false },
     { key: 'farm', q: '秘境・ボス・地脈を回る?', art: 'loop', def: false },
     { key: 'cook', q: '料理は作る?', art: 'pot', def: true },
@@ -37,7 +44,7 @@
   ];
   const ART = {
     flag: '<path d="M20 54V12"/><path d="M20 15h24l-5 7 5 7H20z"/>',
-    spiral: '<path d="M32 34a7 7 0 1 1 7-7 14 14 0 1 1-14 14 21 21 0 1 1 21 21"/>',
+    spiral: '<path d="M32.0 30.0L32.5 29.7L33.0 29.6L33.7 29.6L34.4 29.7L35.0 30.1L35.7 30.6L36.2 31.3L36.6 32.1L36.8 33.1L36.7 34.2L36.5 35.2L35.9 36.3L35.2 37.3L34.2 38.1L33.0 38.7L31.6 39.1L30.1 39.2L28.6 39.0L27.1 38.4L25.6 37.5L24.4 36.3L23.4 34.8L22.7 33.0L22.4 31.2L22.4 29.2L22.9 27.2L23.8 25.2L25.1 23.5L26.8 22.0L28.8 20.9L31.0 20.1L33.4 19.8L35.9 20.1L38.4 20.8L40.7 22.0L42.7 23.8L44.4 25.9L45.7 28.4L46.5 31.2L46.6 34.2L46.2 37.1L45.2 40.0L43.6 42.7L41.4 45.0L38.8 46.9L35.7 48.3L32.4 49.0L29.0 49.1L25.5 48.4L22.2 47.1"/>',
     curtain: '<path d="M12 14h40"/><path d="M20 14c0 9 3 13 3 20v16"/><path d="M44 14c0 9-3 13-3 20v16"/><path d="M12 50h40"/>',
     swords: '<path d="M17 47l23-23"/><path d="M13 43l7 7"/><path d="M47 47L24 24"/><path d="M51 43l-7 7"/>',
     flower: '<circle cx="32" cy="32" r="4.5"/><circle cx="32" cy="18" r="6.5"/><circle cx="45" cy="26" r="6.5"/><circle cx="40" cy="41" r="6.5"/><circle cx="24" cy="41" r="6.5"/><circle cx="19" cy="26" r="6.5"/>',
@@ -50,8 +57,14 @@
     chair: '<path d="M22 12v22h20"/><path d="M22 34h20v16"/><path d="M27 34v10"/><path d="M20 50h4"/>',
     check: '<path d="M14 34l12 12 24-26"/>',
   };
+  // 図形の重心が 32,32 に来るようにずらす（見切れと偏りを防ぐ）
+  const ART_POS = {
+    flag: '0 -1', spiral: '-2.4 -2.4', curtain: '0 0', swords: '0 -5', flower: '0 2.5',
+    coin: '0 0', cards: '0 -1', loop: '0 1.7', pot: '0 0', anvil: '0 -5.5',
+    teapot: '-1.5 -3.5', chair: '1 1', check: '0 -1',
+  };
   const artSvg = (name, cls = 'quiz-art') =>
-    `<svg class="${cls}" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">${ART[name] || ''}</svg>`;
+    `<svg class="${cls}" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><g transform="translate(${ART_POS[name] || '0 0'})">${ART[name] || ''}</g></svg>`;
 
   const ANSWERS_DEFAULT = Object.fromEntries(ANSWERS.map(a => [a.key, a.def]));
 
@@ -69,8 +82,8 @@
     s('stygian', a.stygian);
 
     // ウィークリー
-    // ガチャを回すと育成でモラを使う。初週に集中するので今週だけ。
-    w('mora', a.pull ? 'plan' : 'none', false);
+    // モラ: 今週だけ使う / 毎週コツコツ / 使わない
+    w('mora', a.mora === 'none' ? 'none' : 'plan', a.mora === 'weekly');
     w('tcg', a.tcg ? 'plan' : 'none', a.tcg);
     for (const id of ['domain', 'leyline', 'boss', 'trounce']) w(id, a.farm ? 'plan' : 'none', a.farm);
     w('cook', a.cook ? 'plan' : 'none', a.cook);
@@ -335,8 +348,13 @@
         }
       } else if (k === 'answers') {
         if (saved.answers && typeof saved.answers === 'object') {
-          for (const key of Object.keys(def.answers)) {
-            if (typeof saved.answers[key] === 'boolean') out.answers[key] = saved.answers[key];
+          for (const q of ANSWERS) {
+            const v = saved.answers[q.key];
+            if (q.choices) {
+              if (q.choices.some(c => c.v === v)) out.answers[q.key] = v;
+            } else if (typeof v === 'boolean') {
+              out.answers[q.key] = v;
+            }
           }
         }
       } else {
@@ -347,6 +365,97 @@
   }
 
   let state = loadState();
+
+  // ---------- 計画のURL共有 ----------
+  const b64url = (str) => {
+    const bytes = new TextEncoder().encode(str);
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  const unb64url = (code) => {
+    const pad = code.length % 4 ? '='.repeat(4 - (code.length % 4)) : '';
+    const bin = atob(code.replace(/-/g, '+').replace(/_/g, '/') + pad);
+    return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+  };
+
+  function encodePlan() {
+    const p = {
+      v: 1,
+      l: state.level, e: state.exp, w: state.weekEarned, t: state.todayDone ? 1 : 0,
+      a: state.ar, g: state.target,
+      q: ANSWERS.map(q => (q.choices ? String(q.choices.findIndex(c => c.v === state.answers[q.key])) : (state.answers[q.key] ? '1' : '0'))).join(''),
+      W: WEEKLY.map(m => {
+        const w = state.weekly[m.id] || {};
+        return (w.thisWeek === 'done' ? '2' : w.thisWeek === 'plan' ? '1' : '0') + (w.future ? '1' : '0');
+      }).join(''),
+      S: SEASON.map(m => {
+        const st = state.season[m.id]?.status;
+        return st === 'done' ? '2' : st === 'plan' ? '1' : '0';
+      }).join(''),
+    };
+    if (state.seasonEnd !== SEASON_META.end) p.se = state.seasonEnd;
+    return b64url(JSON.stringify(p));
+  }
+
+  function decodePlan(code) {
+    try {
+      const p = JSON.parse(unb64url(code));
+      if (p.v !== 1) return null;
+      if (String(p.q).length !== ANSWERS.length) return null;
+      if (String(p.W).length !== WEEKLY.length * 2) return null;
+      if (String(p.S).length !== SEASON.length) return null;
+      return p;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function applyPlan(p) {
+    const cl = (v, min, max, d) => (Number.isFinite(Number(v)) ? Math.max(min, Math.min(max, Math.round(Number(v)))) : d);
+    state.level = cl(p.l, 1, 50, 1);
+    state.exp = cl(p.e, 0, 999, 0);
+    state.weekEarned = cl(p.w, 0, 10000, 0);
+    state.todayDone = !!p.t;
+    state.ar = cl(p.a, 20, 60, 60);
+    state.target = cl(p.g, 1, 50, 50);
+    if (typeof p.se === 'string') state.seasonEnd = p.se;
+    ANSWERS.forEach((q, i) => {
+      const c = String(p.q)[i];
+      state.answers[q.key] = q.choices
+        ? (q.choices[Number(c)] || q.choices[q.choices.length - 1]).v
+        : c === '1';
+    });
+    WEEKLY.forEach((m, i) => {
+      const t = String(p.W)[i * 2];
+      const f = String(p.W)[i * 2 + 1];
+      state.weekly[m.id] = { thisWeek: t === '2' ? 'done' : t === '1' ? 'plan' : 'none', future: f === '1' };
+    });
+    SEASON.forEach((m, i) => {
+      const s = String(p.S)[i];
+      state.season[m.id] = { status: s === '2' ? 'done' : s === '1' ? 'plan' : 'none' };
+    });
+  }
+
+  function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(() => {});
+        return true;
+      }
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.className = 'sr-only';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = !!(document.execCommand && document.execCommand('copy'));
+      ta.remove();
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
 
   function save() {
     try {
@@ -431,13 +540,13 @@
         </div>`;
       $('#quizStep').textContent = 'おわり';
       $('[data-quiz-prev]').disabled = false;
-      const yes = ANSWERS.filter(q => state.answers[q.key]).length;
-      $('#quizCount').textContent = `はい ${yes} / ${total}`;
+      const yes = ANSWERS.filter(q => (q.choices ? state.answers[q.key] !== 'none' : state.answers[q.key])).length;
+      $('#quizCount').textContent = `やる ${yes} / ${total}`;
       return;
     }
 
     const item = ANSWERS[quizStep];
-    const on = state.answers[item.key];
+    const val = state.answers[item.key];
     $('#quizBody').innerHTML = `
       <div class="quiz-dots">
         ${ANSWERS.map((q, i) => `<button type="button" class="quiz-dot${i === quizStep ? ' now' : ''}" data-quiz-jump="${i}" aria-label="${i + 1}問目"></button>`).join('')}
@@ -445,15 +554,17 @@
       <div class="quiz-card">
         ${artSvg(item.art)}
         <p class="quiz-q">${item.q}</p>
-        <div class="quiz-answers">
-          <button type="button" class="quiz-btn yes${on ? ' on' : ''}" data-a="${item.key}" data-v="yes">やる</button>
-          <button type="button" class="quiz-btn no${on ? '' : ' on'}" data-a="${item.key}" data-v="no">やらない</button>
-        </div>
+        ${item.choices
+          ? `<div class="quiz-choices">${item.choices.map(c => `<button type="button" class="quiz-btn wide${val === c.v ? ' yes on' : ''}" data-a="${item.key}" data-v="${c.v}">${c.label}</button>`).join('')}</div>`
+          : `<div class="quiz-answers">
+              <button type="button" class="quiz-btn yes${val ? ' on' : ''}" data-a="${item.key}" data-v="yes">やる</button>
+              <button type="button" class="quiz-btn no${val ? '' : ' on'}" data-a="${item.key}" data-v="no">やらない</button>
+            </div>`}
       </div>`;
     $('#quizStep').textContent = `${quizStep + 1} / ${total}`;
     $('[data-quiz-prev]').disabled = quizStep === 0;
-    const yes = ANSWERS.filter(q => state.answers[q.key]).length;
-    $('#quizCount').textContent = `はい ${yes} / ${total}`;
+    const yes = ANSWERS.filter(q => (q.choices ? state.answers[q.key] !== 'none' : state.answers[q.key])).length;
+    $('#quizCount').textContent = `やる ${yes} / ${total}`;
   }
 
   function renderWeekly(d) {
@@ -643,13 +754,27 @@
 
   document.addEventListener('click', (e) => {
     if (e.target.closest('[data-quiz-open]')) { openQuiz(); return; }
+    if (e.target.closest('[data-share]')) {
+      const code = encodePlan();
+      const url = location.origin + location.pathname + '#p=' + code;
+      try { history.replaceState(null, '', '#p=' + code); } catch (_) {}
+      const ok = copyText(url);
+      const el = $('#shareState');
+      if (el) {
+        el.textContent = ok ? 'コピーした' : 'URLを出した';
+        clearTimeout(el._t);
+        el._t = setTimeout(() => { el.textContent = ''; }, 2600);
+      }
+      return;
+    }
     if (e.target.closest('[data-quiz-close]')) { closeQuiz(); return; }
     if (e.target.closest('[data-quiz-prev]')) { quizStep = Math.max(0, quizStep - 1); render(); return; }
     const jump = e.target.closest('[data-quiz-jump]');
     if (jump) { quizStep = Number(jump.dataset.quizJump); render(); return; }
     const ans = e.target.closest('button[data-a]');
     if (ans) {
-      state.answers[ans.dataset.a] = ans.dataset.v === 'yes';
+      const q = ANSWERS.find(x => x.key === ans.dataset.a);
+      state.answers[ans.dataset.a] = q && q.choices ? ans.dataset.v : ans.dataset.v === 'yes';
       applyAnswers(state);
       save();
       if (quizStep < ANSWERS.length) quizStep += 1; // 答えたら次へ
@@ -671,6 +796,15 @@
     save();
     render();
   });
+
+  // 共有URL（#p=...）があれば一度だけ読み込む。読んだらハッシュは消す。
+  (() => {
+    const m = /(?:^|[#&])p=([A-Za-z0-9_-]+)/.exec(location.hash || '');
+    if (!m) return;
+    const shared = decodePlan(m[1]);
+    if (shared) applyPlan(shared);
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+  })();
 
   bindInputs();
   render();

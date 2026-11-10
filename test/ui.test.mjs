@@ -52,7 +52,7 @@ const wseg = (id, v) => document.querySelector(`button[data-w="${id}"][data-v="$
 const futureBox = (id) => document.querySelector(`input[data-future="${id}"]`);
 const budget = () => all('#weeklyBudget .budget').map(p => p.textContent.replace(/\s+/g, ' ').trim());
 // 問診票の質問順（1問ずつ聞く）
-const QKEYS = ['events', 'abyss', 'theater', 'stygian', 'artifacts', 'pull', 'tcg', 'farm', 'cook', 'forge', 'friendpot', 'furniture'];
+const QKEYS = ['events', 'abyss', 'theater', 'stygian', 'artifacts', 'mora', 'tcg', 'farm', 'cook', 'forge', 'friendpot', 'furniture'];
 const answerKeys = () => [...QKEYS];
 const gotoQ = (key) => {
   const i = QKEYS.indexOf(key);
@@ -62,12 +62,14 @@ const gotoQ = (key) => {
 };
 const answer = (key, yes) => {
   gotoQ(key);
-  document.querySelector(`button[data-a="${key}"][data-v="${yes ? 'yes' : 'no'}"]`).click();
+  const btns = [...document.querySelectorAll(`button[data-a="${key}"]`)];
+  (yes ? btns[0] : btns[btns.length - 1]).click();
 };
 const answerAll = (yes) => { for (const k of answerKeys()) answer(k, yes); };
 const quizOn = (key) => {
   gotoQ(key);
-  return document.querySelector(`button[data-a="${key}"][data-v="yes"]`).classList.contains('on');
+  const btns = [...document.querySelectorAll(`button[data-a="${key}"]`)];
+  return btns[0].classList.contains('on');
 };
 const seasonRows = () => all('#seasonRows tr');
 const rowId = (tr) => tr.querySelector('button[data-s]').dataset.s;
@@ -126,14 +128,16 @@ document.querySelector('[data-quiz-prev]').click();
 ok('prev returns to the previous question', text('#quizStep') === '1 / 12', text('#quizStep'));
 all('.quiz-dot')[4].click();
 ok('dots jump to a question', text('#quizStep') === '5 / 12' && text('#quizBody').includes('聖遺物'), text('#quizStep'));
-ok('count is shown on the button', /はい \d+ \/ 12/.test(text('#quizCount')), text('#quizCount'));
+ok('count is shown on the button', /やる \d+ \/ 12/.test(text('#quizCount')), text('#quizCount'));
 ok('events default to yes', quizOn('events'));
 ok('artifacts default to yes', quizOn('artifacts'));
 ok('cooking defaults to yes', quizOn('cook'));
 ok('hard content defaults to no', !quizOn('abyss') && !quizOn('theater') && !quizOn('stygian'));
 ok('七聖召喚 defaults to no', !quizOn('tcg'));
-gotoQ('pull');
-ok('モラの質問は行動で書く', text('#quizBody').includes('今週だけモラをたくさん使う'), text('#quizBody').slice(0, 30));
+gotoQ('mora');
+ok('モラの質問は3択', all('button[data-a="mora"]').length === 3, String(all('button[data-a="mora"]').length));
+ok('モラの選択肢がそのまま出る', text('#quizBody').includes('今週だけ（強化など）') && text('#quizBody').includes('毎週コツコツ50万ずつ') && text('#quizBody').includes('モラがないのよ'), text('#quizBody').slice(0, 60));
+ok('モラは既定で使わない', document.querySelector('button[data-a="mora"][data-v="none"]').classList.contains('on'));
 
 answer('furniture', false);
 ok('answering the last question shows the summary', text('#quizStep') === 'おわり' && text('#quizBody').includes('おつかれ'), text('#quizBody').slice(0, 30));
@@ -148,8 +152,8 @@ setInput('#nowOverride', '2026-12-10T12:00');
 ok('events and artifacts are planned from the start', text('#seasonTotals').includes('やる7件 9,300'), text('#seasonTotals'));
 ok('only the easy weeklies are in', budget()[0].includes('ウィークリー 1,710'), budget()[0]);
 
-answer('pull', true);
-ok('ガチャを回すとモラが今週に入る', budget()[0].includes('ウィークリー 2,160'), budget()[0]);
+answer('mora', true);
+ok('モラを今週使うとモラが今週に入る', budget()[0].includes('ウィークリー 2,160'), budget()[0]);
 answer('tcg', true);
 ok('七聖召喚はいで+675', budget()[0].includes('ウィークリー 2,835'), budget()[0]);
 answer('farm', true);
@@ -258,6 +262,36 @@ const dailyAfter = /デイリー ([\d,]+)/.exec(budget()[0])?.[1];
 ok('today done removes a day from the week', dailyBefore !== dailyAfter && Number(dailyAfter.replace(/,/g, '')) < Number(dailyBefore.replace(/,/g, '')), `${dailyBefore} -> ${dailyAfter}`);
 toggle('[data-bind="todayDone"]', false);
 ok('unchecking restores it', /デイリー ([\d,]+)/.exec(budget()[0])?.[1] === dailyBefore, budget()[0]);
+
+console.log('\n# share url');
+setInput('#level', '20');
+setInput('#exp', '480');
+setInput('#weekEarned', '3100');
+$('#quizOpen').click();
+answer('artifacts', false);
+answer('farm', true);
+document.querySelector('.modal-foot [data-quiz-close]').click();
+const planLevel = heroLevel();
+const planSeason = text('#seasonTotals');
+const planWeekPool = /ウィークリー ([\d,]+)/.exec(budget()[0])?.[1];
+$('#shareBtn').click();
+const hash = window.location.hash;
+ok('share writes the plan into the hash', /^#p=[A-Za-z0-9_-]+$/.test(hash), hash.slice(0, 24));
+
+// 同じURLを開いた別ページで復元できるか
+const shared = new JSDOM(fs.readFileSync(htmlPath, 'utf8'), {
+  runScripts: 'dangerously',
+  url: 'https://example.test/' + hash,
+  beforeParse(w) { w.structuredClone = (v) => JSON.parse(JSON.stringify(v)); },
+});
+const sd = shared.window.document;
+const stext = (sel) => (sd.querySelector(sel)?.textContent || '').replace(/\s+/g, ' ').trim();
+ok('shared page restores the level input', sd.querySelector('#level').value === '20', sd.querySelector('#level').value);
+ok('shared page restores the projection', stext('#resultPanel').includes('Lv ' + planLevel), stext('#resultPanel').slice(0, 30));
+ok('shared page restores the season plan', stext('#seasonTotals') === planSeason, stext('#seasonTotals'));
+ok('shared page restores the weekly plan', /ウィークリー ([\d,]+)/.exec(stext('#weeklyBudget'))?.[1] === planWeekPool, `${planWeekPool} / ${/ウィークリー ([\d,]+)/.exec(stext('#weeklyBudget'))?.[1]}`);
+ok('hash is cleared after reading', !(shared.window.location.hash || '').includes('p='), shared.window.location.hash);
+shared.window.close();
 
 console.log('\n# persistence');
 ok('state saved to localStorage', !!window.localStorage.getItem('genshin-bp-planner-v4'));
