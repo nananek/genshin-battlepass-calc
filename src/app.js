@@ -25,7 +25,7 @@
     { key: 'abyss', label: '深境螺旋をやる', group: 'season', def: false },
     { key: 'theater', label: '幻想シアターをやる', group: 'season', def: false },
     { key: 'stygian', label: '幽境の激戦をやる', group: 'season', def: false },
-    { key: 'pull', label: 'ガチャを回す（モラ50万が今週で終わる）', group: 'weekly', def: false },
+    { key: 'pull', label: '今週だけモラをたくさん使う', group: 'weekly', def: false },
     { key: 'tcg', label: '七聖召喚をやる', group: 'weekly', def: false },
     { key: 'farm', label: '秘境・ボス・地脈を周回する', group: 'weekly', def: false },
     { key: 'cook', label: '料理を作る', group: 'weekly', def: true },

@@ -102,7 +102,7 @@ ok('artifacts default to yes', quizOn('artifacts'));
 ok('cooking defaults to yes', quizOn('cook'));
 ok('hard content defaults to no', !quizOn('abyss') && !quizOn('theater') && !quizOn('stygian'));
 ok('七聖召喚 defaults to no', !quizOn('tcg'));
-ok('ガチャの説明がラベルに入っている', text('#quizBody').includes('モラ50万'), text('#quizBody').slice(0, 60));
+ok('モラの質問は行動で書く', text('#quizBody').includes('今週だけモラをたくさん使う'), text('#quizBody').slice(0, 40));
 document.querySelector('[data-quiz-close]').click();
 ok('close button hides the questionnaire', $('#quizModal').hidden === true);
 $('#quizOpen').click();
