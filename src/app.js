@@ -388,7 +388,17 @@
   }
 
   function renderSeason(d) {
-    const missions = [...d.missions].sort((a, b) => (a.deadlineMs - b.deadlineMs) || (a.exp - b.exp));
+    // 並び順: 幽境を先頭固定 → イベント → 高難度 → 常設。常設がイベントに挟まれないようにする。
+    const CAT_ORDER = { event: 0, hard: 1, fixed: 2 };
+    const PINNED = ['stygian'];
+    const order = new Map(d.missions.map((m, i) => [m.id, i]));
+    const missions = [...d.missions].sort((a, b) => {
+      const pin = (PINNED.includes(a.id) ? 0 : 1) - (PINNED.includes(b.id) ? 0 : 1);
+      if (pin) return pin;
+      const cat = (CAT_ORDER[a.cat] ?? 9) - (CAT_ORDER[b.cat] ?? 9);
+      if (cat) return cat;
+      return (a.deadlineMs - b.deadlineMs) || (order.get(a.id) - order.get(b.id));
+    });
     $('#seasonRows').innerHTML = missions.map(m => {
       const expired = m.deadlineMs < d.nowMs;
       const days = daysUntil(m.deadlineMs, d.nowMs);

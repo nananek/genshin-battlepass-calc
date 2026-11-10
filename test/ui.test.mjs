@@ -151,6 +151,11 @@ const lvBase = heroLevel();
 console.log('\n# season: nothing planned by default');
 const rows = all('#seasonRows tr');
 ok('every season mission listed', rows.length === 11, String(rows.length));
+ok('幽境 is pinned to the top', rows[0].textContent.includes('幽境'));
+ok('categories are grouped', (() => {
+  const cats = rows.map(tr => tr.querySelector('.badge')?.textContent.trim());
+  return cats.join(',') === 'イベント,イベント,イベント,イベント,イベント,高難度,高難度,常設,常設,常設,常設';
+})(), rows.map(tr => tr.querySelector('.badge')?.textContent.trim()).join(','));
 ok('nothing is planned up front', text('#seasonTotals').includes('やる0件'), text('#seasonTotals'));
 
 const liveRow = rows[rows.length - 1];
