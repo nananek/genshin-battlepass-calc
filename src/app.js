@@ -199,7 +199,7 @@
       weeks, reached, totalOverflow,
       missions, planned, plannedSeasonExp, expired,
       deficit, surplus, startTotal, needNow, needPerWeek, weeksLeft, weeklyEarned7,
-      weeklyFull, weeklyShort: Math.max(0, WEEK_CAP - (DAILY_EXP * 7 + nextWeekPool)),
+      weeklyFull,
       currentWeek: weeks[0] || null,
     };
   }
@@ -323,9 +323,6 @@
     const noSeasonLevel = Math.min(MAX_LEVEL, Math.floor(d.totalNoSeason / LEVEL_EXP) + 1);
 
     const notes = [];
-    if (d.weeklyShort > 0) {
-      notes.push(`<p class="note gold">来週以降に残すウィークリーは週 ${num(d.nextWeekPool)} EXP。デイリー7日分と合わせても週上限には ${num(d.weeklyShort)} EXP 足りない。</p>`);
-    }
     if (d.expired.length > 0) {
       notes.push(`<p class="note red">期限切れの任務が${d.expired.length}件ある。見込みには加えていない。</p>`);
     }
@@ -459,7 +456,7 @@
     $('#chart').innerHTML = `${grid}<path class="area" d="${area}"></path><path class="plot" d="${line}"></path>${target}${dots}${ticks}`;
     $('#chart').setAttribute('aria-label',
       `累計EXPの推移。いま ${num(startTotal)}、シーズン終了時 ${num(d.total)}、目標 ${num(d.targetTotal)}`);
-    $('#chartHint').textContent = `全${d.weeks.length}週／週 ${num(d.weeklyFull)} EXP まで`;
+    $('#chartHint').textContent = `全${d.weeks.length}週`;
   }
 
   function bindInputs() {

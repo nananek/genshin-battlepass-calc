@@ -77,7 +77,7 @@ ok('cap respected every week', d0.weeks.every(w => w.applied <= 10000));
 ok('full weeks reach the cap', d0.weeks.slice(1).every(w => w.applied === 10000));
 eq('current week days', d0.weeks[0].days, 6); // 11/10(火) 19:27、月曜の分はもう終わっている
 eq('weekly per week', d0.weeklyFull, 10000);
-eq('ar shortfall', d0.weeklyShort, 0);
+eq('weekly max at ar60', d0.weeklyFull, 10000);
 ok('total increases monotonically', d0.weeks.every((w, i) => i === 0 || w.total >= d0.weeks[i - 1].total));
 ok('level within 1..50', d0.weeks.every(w => w.level >= 1 && w.level <= 50));
 
@@ -111,8 +111,8 @@ for (const ar of [20, 28, 32, 60]) {
   const expected = WEEKLY.filter(m => m.ar <= ar).reduce((s, m) => s + m.exp, 0);
   eq(`ar${ar} weekly max`, d.arMax, expected);
 }
-eq('ar20 misses the cap', compute({ ...base, ar: 20 }).weeklyShort, 10000 - (dailyTotal * 7 + 4545));
-eq('ar28 reaches the cap', compute({ ...base, ar: 28 }).weeklyShort, 0);
+eq('ar20 week max', compute({ ...base, ar: 20 }).weeklyFull, dailyTotal * 7 + 4545);
+eq('ar28 week max', compute({ ...base, ar: 28 }).weeklyFull, 10000);
 ok('ar20 raw weekly below cap', compute({ ...base, ar: 20 }).weeks[1].rawDaily + compute({ ...base, ar: 20 }).weeks[1].rawWeekly < 10000);
 
 section('pearl');
