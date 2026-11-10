@@ -94,10 +94,11 @@ console.log('\n# quiz');
 ok('quiz is closed at first', $('#quizModal').hidden === true);
 $('#quizOpen').click();
 ok('button opens the questionnaire', $('#quizModal').hidden === false);
-ok('eleven questions', all('button[data-a]').length === 22 && answerKeys().length === 11, String(answerKeys().length));
+ok('twelve questions', all('button[data-a]').length === 24 && answerKeys().length === 12, String(answerKeys().length));
 ok('questions are grouped', text('#quizBody').includes('聖遺物') && text('#quizBody').includes('七聖召喚'));
-ok('count is shown on the button', /はい \d+ \/ 11/.test(text('#quizCount')), text('#quizCount'));
+ok('count is shown on the button', /はい \d+ \/ 12/.test(text('#quizCount')), text('#quizCount'));
 const quizOn = (key) => document.querySelector(`button[data-a="${key}"][data-v="yes"]`).classList.contains('on');
+ok('events default to yes', quizOn('events'));
 ok('artifacts default to yes', quizOn('artifacts'));
 ok('cooking defaults to yes', quizOn('cook'));
 ok('hard content defaults to no', !quizOn('abyss') && !quizOn('theater') && !quizOn('stygian'));
@@ -109,7 +110,7 @@ $('#quizOpen').click();
 
 console.log('\n# quiz fills the tables');
 setInput('#nowOverride', '2026-12-10T12:00');
-ok('artifacts are planned from the start', text('#seasonTotals').includes('やる3件'), text('#seasonTotals'));
+ok('events and artifacts are planned from the start', text('#seasonTotals').includes('やる7件 9,300'), text('#seasonTotals'));
 ok('only the easy weeklies are in', budget()[0].includes('ウィークリー 1,710'), budget()[0]);
 
 answer('pull', true);
@@ -122,7 +123,9 @@ answer('cook', false);
 ok('料理いいえで-360', budget()[0].includes('ウィークリー 5,175'), budget()[0]);
 
 answer('artifacts', false);
-ok('聖遺物いいえでシーズン任務が外れる', text('#seasonTotals').includes('やる0件'), text('#seasonTotals'));
+ok('聖遺物いいえでイベントだけ残る', text('#seasonTotals').includes('やる4件 5,700'), text('#seasonTotals'));
+answer('events', false);
+ok('イベントいいえで全部外れる', text('#seasonTotals').includes('やる0件'), text('#seasonTotals'));
 answer('abyss', true);
 ok('螺旋はいで1件入る', text('#seasonTotals').includes('やる1件 2,250'), text('#seasonTotals'));
 answer('abyss', false);

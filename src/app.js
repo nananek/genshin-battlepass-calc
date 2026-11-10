@@ -21,6 +21,7 @@
 
   // 問診票の既定。買わない・やらない側に倒しておく。
   const ANSWERS = [
+    { key: 'events', label: 'イベント任務をやる', group: 'season', def: true },
     { key: 'artifacts', label: '聖遺物を強化する', group: 'season', def: true },
     { key: 'abyss', label: '深境螺旋をやる', group: 'season', def: false },
     { key: 'theater', label: '幻想シアターをやる', group: 'season', def: false },
@@ -42,6 +43,7 @@
     const s = (id, on) => { if (state.season[id]) state.season[id] = { status: on ? 'plan' : 'none' }; };
 
     // シーズン任務
+    for (const m of SEASON) if (m.cat === 'event') s(m.id, a.events);
     for (const id of ['art30', 'art60', 'art100']) s(id, a.artifacts);
     s('abyss', a.abyss);
     s('theater', a.theater);
