@@ -19,19 +19,67 @@
   const WD = ['日', '月', '火', '水', '木', '金', '土'];
   const DAILY_EXP = DAILY.reduce((s, m) => s + m.exp, 0);
 
+  // 問診票の既定。買わない・やらない側に倒しておく。
+  const ANSWERS = [
+    { key: 'artifacts', label: '聖遺物を強化する', group: 'season', def: true },
+    { key: 'abyss', label: '深境螺旋をやる', group: 'season', def: false },
+    { key: 'theater', label: '幻想シアターをやる', group: 'season', def: false },
+    { key: 'stygian', label: '幽境の激戦をやる', group: 'season', def: false },
+    { key: 'pull', label: 'ガチャを回す', group: 'weekly', def: false },
+    { key: 'tcg', label: '七聖召喚をやる', group: 'weekly', def: false },
+    { key: 'farm', label: '秘境・ボス・地脈を周回する', group: 'weekly', def: false },
+    { key: 'cook', label: '料理を作る', group: 'weekly', def: true },
+    { key: 'forge', label: '鍛造を頼む', group: 'weekly', def: false },
+    { key: 'friendpot', label: '他人の壺で買い物をする', group: 'weekly', def: false },
+    { key: 'furniture', label: '調度品を作る', group: 'weekly', def: false },
+  ];
+  const ANSWERS_DEFAULT = Object.fromEntries(ANSWERS.map(a => [a.key, a.def]));
+
+  // 問診票の答えを任務の選択に反映する。表側はあとから手で直してよい。
+  function applyAnswers(state) {
+    const a = state.answers || ANSWERS_DEFAULT;
+    const w = (id, thisWeek, future) => { if (state.weekly[id]) state.weekly[id] = { thisWeek, future }; };
+    const s = (id, on) => { if (state.season[id]) state.season[id] = { status: on ? 'plan' : 'none' }; };
+
+    // シーズン任務
+    for (const id of ['art30', 'art60', 'art100']) s(id, a.artifacts);
+    s('abyss', a.abyss);
+    s('theater', a.theater);
+    s('stygian', a.stygian);
+
+    // ウィークリー
+    // ガチャを回すと育成でモラを使う。初週に集中するので今週だけ。
+    w('mora', a.pull ? 'plan' : 'none', false);
+    w('tcg', a.tcg ? 'plan' : 'none', a.tcg);
+    for (const id of ['domain', 'leyline', 'boss', 'trounce']) w(id, a.farm ? 'plan' : 'none', a.farm);
+    w('cook', a.cook ? 'plan' : 'none', a.cook);
+    w('forge', a.forge ? 'plan' : 'none', a.forge);
+    w('friendpot', a.friendpot ? 'plan' : 'none', a.friendpot);
+    w('furniture', a.furniture ? 'plan' : 'none', a.furniture);
+    // デイリーを回していれば樹脂も洞天宝銭も自然に貯まる
+    w('resin1200', 'plan', true);
+    w('teapot', 'plan', true);
+  }
+
   // 入力は紀行画面から拾える数字だけ。デイリーは毎日、ウィークリーは選んだものを毎週やる前提。
-  const DEFAULT_STATE = {
-    target: 50,
-    level: 1,
-    exp: 0,
-    weekEarned: 0,
-    todayDone: false,
-    ar: 60,
-    seasonEnd: SEASON_META.end,
-    nowOverride: '',
-    weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'plan', future: true }])),
-    season: Object.fromEntries(SEASON.map(m => [m.id, { status: 'none' }])),
-  };
+  function defaultState() {
+    const s = {
+      target: 50,
+      level: 1,
+      exp: 0,
+      weekEarned: 0,
+      todayDone: false,
+      ar: 60,
+      seasonEnd: SEASON_META.end,
+      nowOverride: '',
+      answers: { ...ANSWERS_DEFAULT },
+      weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'none', future: false }])),
+      season: Object.fromEntries(SEASON.map(m => [m.id, { status: 'none' }])),
+    };
+    applyAnswers(s);
+    return s;
+  }
+  const DEFAULT_STATE = defaultState();
 
   // ---------- date helpers (JST, 05:00 reset) ----------
   function parseJst(v) {
@@ -264,6 +312,12 @@
             if (st === 'done' || st === 'plan' || st === 'none') out.season[id] = { status: st };
           }
         }
+      } else if (k === 'answers') {
+        if (saved.answers && typeof saved.answers === 'object') {
+          for (const key of Object.keys(def.answers)) {
+            if (typeof saved.answers[key] === 'boolean') out.answers[key] = saved.answers[key];
+          }
+        }
       } else {
         out[k] = saved[k];
       }
@@ -294,6 +348,7 @@
     const d = compute(state);
     renderCountdown(d);
     renderResult(d);
+    renderQuiz();
     renderWeekly(d);
     renderSeason(d);
     renderChart(d);
@@ -334,6 +389,19 @@
         <div><span>シーズン任務を除くと</span><b>Lv ${noSeasonLevel}</b></div>
       </div>
       ${notes.length ? `<div class="notes">${notes.join('')}</div>` : ''}`;
+  }
+
+  function renderQuiz() {
+    const a = state.answers;
+    const row = (q) => `<div class="quiz-row">
+        <span>${q.label}</span>
+        <div class="seg">
+          <button type="button" data-a="${q.key}" data-v="yes" class="${a[q.key] ? 'on done' : ''}">はい</button>
+          <button type="button" data-a="${q.key}" data-v="no" class="${a[q.key] ? '' : 'on none'}">いいえ</button>
+        </div>
+      </div>`;
+    $('#quizSeason').innerHTML = ANSWERS.filter(q => q.group === 'season').map(row).join('');
+    $('#quizWeekly').innerHTML = ANSWERS.filter(q => q.group === 'weekly').map(row).join('');
   }
 
   function renderWeekly(d) {
@@ -384,17 +452,8 @@
   }
 
   function renderSeason(d) {
-    // 並び順: 幽境を先頭固定 → イベント → 高難度 → 常設。常設がイベントに挟まれないようにする。
-    const CAT_ORDER = { event: 0, hard: 1, fixed: 2 };
-    const PINNED = ['stygian'];
-    const order = new Map(d.missions.map((m, i) => [m.id, i]));
-    const missions = [...d.missions].sort((a, b) => {
-      const pin = (PINNED.includes(a.id) ? 0 : 1) - (PINNED.includes(b.id) ? 0 : 1);
-      if (pin) return pin;
-      const cat = (CAT_ORDER[a.cat] ?? 9) - (CAT_ORDER[b.cat] ?? 9);
-      if (cat) return cat;
-      return (a.deadlineMs - b.deadlineMs) || (order.get(a.id) - order.get(b.id));
-    });
+    // 並び順は data/season.json の順。イベント → 聖遺物 → 祈願 → 高難度。
+    const missions = d.missions;
     $('#seasonRows').innerHTML = missions.map(m => {
       const expired = m.deadlineMs < d.nowMs;
       const days = daysUntil(m.deadlineMs, d.nowMs);
@@ -512,6 +571,14 @@
   });
 
   document.addEventListener('click', (e) => {
+    const ans = e.target.closest('button[data-a]');
+    if (ans) {
+      state.answers[ans.dataset.a] = ans.dataset.v === 'yes';
+      applyAnswers(state);
+      save();
+      render();
+      return;
+    }
     const w = e.target.closest('button[data-w]');
     if (w) {
       const id = w.dataset.w;

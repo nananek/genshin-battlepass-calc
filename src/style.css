@@ -168,6 +168,12 @@
   .text-input { background: #fff; border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 6px 9px; }
   .text-input:focus-visible, .num:focus-visible, select:focus-visible { outline: 2px solid #dbe7ff; border-color: var(--blue); }
   select { background: #fff; border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 6px 8px; max-width: 200px; }
+  .quiz { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 30px; }
+  .quiz h3 { margin: 0 0 4px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .quiz-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line-soft); }
+  .quiz-row:last-child { border-bottom: 0; }
+  .quiz-row > span { font-size: 14px; }
+  .quiz-row .seg button { padding: 3px 9px; font-size: 12.5px; }
   .check { display: flex; align-items: flex-start; gap: 8px; color: var(--muted); font-size: 14px; cursor: pointer; padding: 7px 0; }
   .check input { margin-top: 5px; accent-color: var(--blue); }
 
@@ -189,6 +195,7 @@
 
   @media (max-width: 560px) {
     .wrap { padding-bottom: calc(148px + env(safe-area-inset-bottom)); }
+    .quiz { grid-template-columns: 1fr; }
     .landing-side { width: 100%; margin-left: 0; justify-content: space-between; gap: 12px; }
   }
   @media (max-width: 760px) {

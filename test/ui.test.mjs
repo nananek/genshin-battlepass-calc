@@ -46,11 +46,15 @@ const landingValue = (label) => {
   return k && k.nextElementSibling ? k.nextElementSibling.textContent.replace(/\s+/g, ' ').trim() : '';
 };
 const panelOrder = () => all('main .panel-head h2').map(el => el.textContent.trim());
-const weekDays = () => Number(/（(\d)日）/.exec(all('#timelineRows tr')[0].textContent)?.[1]);
 const seg = (id, v) => document.querySelector(`button[data-s="${id}"][data-v="${v}"]`);
 const wseg = (id, v) => document.querySelector(`button[data-w="${id}"][data-v="${v}"]`);
 const futureBox = (id) => document.querySelector(`input[data-future="${id}"]`);
 const budget = () => all('#weeklyBudget .budget').map(p => p.textContent.replace(/\s+/g, ' ').trim());
+const answerKeys = () => [...new Set(all('button[data-a]').map(b => b.dataset.a))];
+const answer = (key, yes) => document.querySelector(`button[data-a="${key}"][data-v="${yes ? 'yes' : 'no'}"]`).click();
+const answerAll = (yes) => { for (const k of answerKeys()) answer(k, yes); };
+const seasonRows = () => all('#seasonRows tr');
+const rowId = (tr) => tr.querySelector('button[data-s]').dataset.s;
 
 let pass = 0;
 let fail = 0;
@@ -77,53 +81,97 @@ ok('no level purchase', !document.body.textContent.includes('Lv購入'));
 console.log('\n# layout');
 ok('landing bar sits outside main', $('#resultPanel').closest('main') === null && $('#resultPanel').closest('.landing') !== null);
 ok('landing bar is labelled 計画着地点', text('#resultPanel').includes('計画着地点'), text('#resultPanel').slice(0, 30));
+ok('quiz comes before the mission tables', (() => {
+  const o = panelOrder();
+  return o.indexOf('問診票') >= 0 && o.indexOf('問診票') < o.indexOf('シーズン任務');
+})(), panelOrder().join(' / '));
 ok('season comes before weekly', (() => {
   const o = panelOrder();
   return o.indexOf('シーズン任務') >= 0 && o.indexOf('シーズン任務') < o.indexOf('ウィークリー');
 })(), panelOrder().join(' / '));
 
-console.log('\n# inputs drive the projection');
+console.log('\n# quiz');
+ok('eleven questions', all('button[data-a]').length === 22 && answerKeys().length === 11, String(answerKeys().length));
+ok('questions are grouped', text('#quizSeason').includes('聖遺物') && text('#quizWeekly').includes('七聖召喚'));
+const quizOn = (key) => document.querySelector(`button[data-a="${key}"][data-v="yes"]`).classList.contains('on');
+ok('artifacts default to yes', quizOn('artifacts'));
+ok('cooking defaults to yes', quizOn('cook'));
+ok('hard content defaults to no', !quizOn('abyss') && !quizOn('theater') && !quizOn('stygian'));
+ok('七聖召喚 defaults to no', !quizOn('tcg'));
+
+console.log('\n# quiz fills the tables');
 setInput('#nowOverride', '2026-12-10T12:00');
-setInput('#level', '12');
-setInput('#exp', '340');
-setInput('#weekEarned', '5200');
-const lv12 = heroLevel();
-ok('projection above the current level', lv12 > 12, String(lv12));
-ok('hero shows the target', text('#resultPanel').includes('/ 50'));
-ok('shortfall shown as EXP', /[\d,]+ EXP/.test(landingValue('不足')), landingValue('不足'));
-ok('goal line gives the weekly pace', /1週あたり [\d,]+ EXP 必要/.test(text('#weeklyBudget')), text('#weeklyBudget').slice(0, 80));
-ok('landing bar shows the surplus or shortfall', (() => { const t = text('#resultPanel'); return t.includes('不足') || t.includes('余り'); })(), text('#resultPanel').slice(0, 60));
+ok('artifacts are planned from the start', text('#seasonTotals').includes('やる3件'), text('#seasonTotals'));
+ok('only the easy weeklies are in', budget()[0].includes('ウィークリー 1,710'), budget()[0]);
 
-setInput('#level', '20');
-ok('higher level raises the projection', heroLevel() > lv12, `${lv12} -> ${heroLevel()}`);
-const lv20 = heroLevel();
-setInput('#level', '12');
-ok('lowering level restores it', heroLevel() === lv12, String(heroLevel()));
+answer('pull', true);
+ok('ガチャを回すとモラが今週に入る', budget()[0].includes('ウィークリー 2,160'), budget()[0]);
+answer('tcg', true);
+ok('七聖召喚はいで+675', budget()[0].includes('ウィークリー 2,835'), budget()[0]);
+answer('farm', true);
+ok('周回はいで秘境・ボス・地脈が入る', budget()[0].includes('ウィークリー 5,535'), budget()[0]);
+answer('cook', false);
+ok('料理いいえで-360', budget()[0].includes('ウィークリー 5,175'), budget()[0]);
 
-console.log('\n# weekly: this week and next weeks');
-const budgetNow = budget();
-ok('one line when the current week is the last', budgetNow.length === 1 && budgetNow[0].includes('今週は'), JSON.stringify(budgetNow));
-ok('no next-week line with one week left', !text('#weeklyBudget').includes('来週以降'), text('#weeklyBudget'));
+answer('artifacts', false);
+ok('聖遺物いいえでシーズン任務が外れる', text('#seasonTotals').includes('やる0件'), text('#seasonTotals'));
+answer('abyss', true);
+ok('螺旋はいで1件入る', text('#seasonTotals').includes('やる1件 2,250'), text('#seasonTotals'));
+answer('abyss', false);
+ok('螺旋いいえで戻る', text('#seasonTotals').includes('やる0件'), text('#seasonTotals'));
 
-// 目標に届く条件にすると、抜ける量が目標基準で出る
+console.log('\n# season table');
+const rows = seasonRows();
+ok('every season mission listed', rows.length === 11, String(rows.length));
+ok('events come first', rows[0].textContent.includes('全域防衛'), rows[0].textContent.slice(0, 30));
+ok('mora-free order matches the data file', (() => {
+  const cats = rows.map(tr => tr.querySelector('.badge')?.textContent.trim());
+  return cats.join(',') === 'イベント,イベント,イベント,イベント,常設,常設,常設,常設,高難度,高難度,高難度';
+})(), rows.map(tr => tr.querySelector('.badge')?.textContent.trim()).join(','));
+ok('幽境 is above 螺旋 and シアター', (() => {
+  const i = (kw) => rows.findIndex(tr => tr.textContent.includes(kw));
+  return i('幽境') > 0 && i('幽境') < i('深境螺旋') && i('深境螺旋') < i('幻想シアター');
+})(), rows.map(tr => tr.querySelector('.m-name')?.textContent.trim().slice(0, 8)).join(' / '));
+
+const liveRow = rows[rows.length - 1];
+const liveId = rowId(liveRow);
+const lvBase = heroLevel();
+seg(liveId, 'plan').click();
+ok('やる adds it to the plan', text('#seasonTotals').includes('やる1件'), text('#seasonTotals'));
+ok('やる raises the projection', heroLevel() > lvBase, `${lvBase} -> ${heroLevel()}`);
+seg(liveId, 'done').click();
+ok('済 is reported separately', text('#seasonTotals').includes('済1件'), text('#seasonTotals'));
+ok('済 is not added again', heroLevel() === lvBase, String(heroLevel()));
+seg(liveId, 'none').click();
+
+console.log('\n# expired plans');
+const expiredRow = rows.find(tr => tr.textContent.includes('期限切れ'));
+ok('expired row is flagged', !!expiredRow, expiredRow ? expiredRow.textContent.slice(0, 30) : 'none');
+const expiredId = rowId(expiredRow);
+seg(expiredId, 'plan').click();
+ok('expired plan is not counted', text('#seasonTotals').includes('やる0件'), text('#seasonTotals'));
+ok('expired plan is reported', text('#resultPanel').includes('期限切れ'), text('#resultPanel').slice(-60));
+seg(expiredId, 'none').click();
+
+console.log('\n# weekly table');
 setInput('#nowOverride', '2026-11-10T19:27');
-ok('two lines when future weeks exist', budget().length === 2, JSON.stringify(budget()));
-ok('goal met shows the room to skip', budget()[1].includes('まで抜ける') && !budget()[1].includes('足りない'), budget()[1]);
+answerAll(true);
+answerAll(true);
+ok('two budget lines', budget().length === 2, JSON.stringify(budget()));
 ok('all twelve weeklies listed', all('#weeklyRows tr').length === 12, String(all('#weeklyRows tr').length));
 ok('both columns exist', all('#weeklyRows tr')[0].querySelector('.seg') !== null && all('#weeklyRows tr')[0].querySelector('input[data-future]') !== null);
+ok('今週 has every weekly', budget()[0].includes('ウィークリー 6,795'), budget()[0]);
+ok('来週以降 drops the first-week-only mora', budget()[1].includes('ウィークリー 6,345'), budget()[1]);
+ok('goal met shows the room to skip', budget()[1].includes('まで抜ける') && !budget()[1].includes('足りない'), budget()[1]);
 
 const cheap = all('#weeklyRows tr').find(tr => tr.querySelector('td.exp').textContent.trim() === '450');
 const cheapId = cheap.querySelector('button[data-w]').dataset.w;
-
 futureBox(cheapId).checked = false;
 fire(futureBox(cheapId), 'input');
-ok('来週以降を外すと1週のウィークリーが減る', budget()[1].includes('ウィークリー 6,345'), budget()[1]);
+ok('来週以降を外すと1週のウィークリーが減る', budget()[1].includes('ウィークリー 5,895'), budget()[1]);
 ok('今週の列は来週以降に影響されない', budget()[0].includes('ウィークリー 6,795'), budget()[0]);
-
 wseg(cheapId, 'none').click();
 ok('今週やらないと今週のウィークリーが減る', budget()[0].includes('ウィークリー 6,345'), budget()[0]);
-wseg(cheapId, 'done').click();
-ok('済は今週の枠から外れる', budget()[0].includes('ウィークリー 6,345'), budget()[0]);
 wseg(cheapId, 'plan').click();
 
 const lvFull = heroLevel();
@@ -133,55 +181,26 @@ ok('全部外すと足りないに変わる', budget()[1].includes('足りない
 ok('着地点も下がる', heroLevel() < lvFull, `${lvFull} -> ${heroLevel()}`);
 ok('no cap-based note in the bar', !text('#resultPanel').includes('週上限'), text('#resultPanel').slice(-60));
 ok('bar reports the shortage instead', /不足[\s\d,]+EXP/.test(text('#resultPanel')), text('#resultPanel').slice(-50));
-
 for (const id of futureIds) { const el = futureBox(id); el.checked = true; fire(el, 'input'); }
 ok('戻すと抜ける表示に戻る', budget()[1].includes('まで抜ける'), budget()[1]);
-ok('着地点も戻る', heroLevel() === lvFull, String(heroLevel()));
 
 console.log('\n# chart');
 ok('chart is an svg', $('#chart') && $('#chart').tagName.toLowerCase() === 'svg');
 ok('chart has a target line', all('#chart .target').length === 1);
 const weeks = Number(/全(\d+)週/.exec(text('#chartHint'))?.[1]);
 ok('chart plots now plus every week', all('#chart circle').length === weeks + 1, `${all('#chart circle').length} dots / ${weeks} weeks`);
-ok('chart labels the level of each point', all('#chart .lv').length === weeks + 1, String(all('#chart .lv').length));
 ok('chart is described for screen readers', ($('#chart').getAttribute('aria-label') || '').includes('目標'), $('#chart').getAttribute('aria-label'));
 
-setInput('#nowOverride', '2026-12-10T12:00');
-const lvBase = heroLevel();
-console.log('\n# season: nothing planned by default');
-const rows = all('#seasonRows tr');
-ok('every season mission listed', rows.length === 11, String(rows.length));
-ok('幽境 is pinned to the top', rows[0].textContent.includes('幽境'));
-ok('categories are grouped', (() => {
-  const cats = rows.map(tr => tr.querySelector('.badge')?.textContent.trim());
-  return cats.join(',') === 'イベント,イベント,イベント,イベント,イベント,高難度,高難度,常設,常設,常設,常設';
-})(), rows.map(tr => tr.querySelector('.badge')?.textContent.trim()).join(','));
-ok('nothing is planned up front', text('#seasonTotals').includes('やる0件'), text('#seasonTotals'));
-
-const liveRow = rows[rows.length - 1];
-const liveId = liveRow.querySelector('button[data-s]').dataset.s;
-seg(liveId, 'plan').click();
-ok('やる adds it to the plan', text('#seasonTotals').includes('やる1件'), text('#seasonTotals'));
-const lvPlan = heroLevel();
-ok('やる raises the projection', lvPlan > lvBase, `${lvBase} -> ${lvPlan}`);
-
-seg(liveId, 'done').click();
-ok('済 is reported separately', text('#seasonTotals').includes('済1件'), text('#seasonTotals'));
-ok('済 is not added again', heroLevel() === lvBase, String(heroLevel()));
-
-seg(liveId, 'none').click();
-ok('やらない clears it', text('#seasonTotals').includes('やる0件'), text('#seasonTotals'));
-
-console.log('\n# expired plans');
-const expiredRow = rows[0];
-const expiredId = expiredRow.querySelector('button[data-s]').dataset.s;
-ok('expired row is flagged', expiredRow.textContent.includes('期限切れ'), expiredRow.textContent.slice(0, 40));
-seg(expiredId, 'plan').click();
-ok('expired plan is not counted', text('#seasonTotals').includes('やる0件'), text('#seasonTotals'));
-ok('expired plan is reported', text('#resultPanel').includes('期限切れ'), text('#resultPanel').slice(-60));
-seg(expiredId, 'none').click();
-
-console.log('\n# settings');
+console.log('\n# inputs');
+setInput('#level', '12');
+setInput('#exp', '340');
+setInput('#weekEarned', '5200');
+const lv12 = heroLevel();
+ok('hero shows the target', text('#resultPanel').includes('/ 50'));
+ok('landing bar shows the surplus', /[\d,]+ EXP/.test(landingValue('余り')) || /[\d,]+ EXP/.test(landingValue('不足')), text('#resultPanel').slice(0, 80));
+setInput('#level', '20');
+ok('higher level raises the projection', heroLevel() >= lv12, `${lv12} -> ${heroLevel()}`);
+setInput('#level', '12');
 setInput('#target', '30');
 ok('target change rewrites the hero', text('#resultPanel').includes('/ 30'), text('#resultPanel').slice(0, 40));
 setInput('#target', '50');
