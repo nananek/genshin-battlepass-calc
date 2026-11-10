@@ -412,84 +412,6 @@
       ${notes.length ? `<div class="notes">${notes.join('')}</div>` : ''}`;
   }
 
-  // バックエンドが無いので、状態をそのまま貼れる相談文にしてChatGPTへ渡す。
-  function buildPrompt() {
-    const d = compute(state);
-    const L = [];
-    const st = (w) => (w.thisWeek === 'done' ? '済' : w.thisWeek === 'plan' ? 'やる' : 'やらない');
-    const ss = (st2) => (st2 === 'done' ? '済' : st2 === 'plan' ? 'やる' : 'やらない');
-
-    L.push(`原神の紀行「${SEASON_META.name}」（${SEASON_META.startLabel}〜${SEASON_META.endLabel}）の消化計画を立ててください。`);
-    L.push('');
-    L.push(`いま: 紀行Lv ${state.level}（${state.exp} / 1,000）、今週の獲得経験値 ${state.weekEarned} / 10,000`);
-    L.push(`目標: Lv${state.target}（${num(d.targetTotal)} EXP）／残り${d.weeksLeft}週`);
-    L.push('');
-    L.push('ルール');
-    L.push('- 紀行経験1,000でLv+1。Lv50が上限');
-    L.push(`- デイリー4件で1日${num(d.dailyExp)} EXP（毎日やる前提）`);
-    L.push('- デイリーとウィークリーは週10,000 EXPまで。超えた分は加算されない（月曜05:00リセット）');
-    L.push('- シーズン任務は週上限の対象外');
-    L.push('- Lv購入はしない');
-    L.push('');
-    L.push('ウィークリー（週1回・上限に含む）');
-    for (const m of WEEKLY) {
-      const w = state.weekly[m.id] || { thisWeek: 'none', future: false };
-      L.push(`- ${m.name} ${m.exp} EXP（AR${m.ar}以上）… 今週: ${st(w)} / 来週以降: ${w.future ? '毎週やる' : 'やらない'}`);
-    }
-    L.push('');
-    L.push('シーズン任務（上限の外）');
-    for (const m of d.missions) {
-      L.push(`- ${m.name} ${m.exp} EXP（期限 ${fmtDate(m.deadlineMs)}）… ${ss(m.status)}`);
-    }
-    L.push('');
-    L.push('お願い');
-    L.push('1. 週10,000を超えない範囲で、やらなくてよいウィークリーを選んでください。労力が小さいほど助かります');
-    L.push('2. シーズン任務の やる／やらない を決めてください');
-    L.push('3. 着地点のLvと、目標までの不足または余りを出してください');
-    L.push('4. 週ごとの目安を短い表にしてください');
-    return L.join('\n');
-  }
-
-  function askChatGpt() {
-    const prompt = buildPrompt();
-    const box = $('#aiPrompt');
-    if (box) box.value = prompt;
-    const preview = $('#aiPromptPreview');
-    if (preview) preview.textContent = prompt;
-
-    let copied = false;
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(prompt).catch(() => {});
-        copied = true;
-      } else if (box) {
-        box.select();
-        copied = !!(document.execCommand && document.execCommand('copy'));
-      }
-    } catch (_) { copied = false; }
-
-    const enc = encodeURIComponent(prompt);
-    const targets = [
-      ['#aiChatgpt', 'https://chatgpt.com/?q=' + enc],
-      ['#aiClaude', 'https://claude.ai/new?q=' + enc],
-      // Gemini は ?q= が公式に保証されていない。効けば入るし、効かなければコピーした文を貼る。
-      ['#aiGemini', 'https://gemini.google.com/app?q=' + enc],
-    ];
-    for (const [sel, href] of targets) {
-      const a = $(sel);
-      if (a) a.href = href;
-    }
-    const box2 = $('#aiTargets');
-    if (box2) box2.hidden = false;
-
-    const state2 = $('#aiState');
-    if (state2) {
-      state2.textContent = copied ? 'コピーした。送り先をえらぶ' : '文面を出した';
-      clearTimeout(askChatGpt._t);
-      askChatGpt._t = setTimeout(() => { state2.textContent = ''; }, 4000);
-    }
-  }
-
   let quizStep = 0;
 
   function renderQuiz() {
@@ -721,7 +643,6 @@
 
   document.addEventListener('click', (e) => {
     if (e.target.closest('[data-quiz-open]')) { openQuiz(); return; }
-    if (e.target.closest('[data-ai-ask]')) { askChatGpt(); return; }
     if (e.target.closest('[data-quiz-close]')) { closeQuiz(); return; }
     if (e.target.closest('[data-quiz-prev]')) { quizStep = Math.max(0, quizStep - 1); render(); return; }
     const jump = e.target.closest('[data-quiz-jump]');

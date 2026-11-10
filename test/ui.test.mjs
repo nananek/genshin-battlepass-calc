@@ -259,20 +259,6 @@ ok('today done removes a day from the week', dailyBefore !== dailyAfter && Numbe
 toggle('[data-bind="todayDone"]', false);
 ok('unchecking restores it', /デイリー ([\d,]+)/.exec(budget()[0])?.[1] === dailyBefore, budget()[0]);
 
-console.log('\n# ai hand-off');
-ok('destinations are hidden before asking', $('#aiTargets').hidden === true);
-$('#aiAsk').click();
-const prompt = text('#aiPromptPreview');
-ok('prompt shows the current numbers', prompt.includes('紀行Lv') && prompt.includes('今週の獲得経験値'), prompt.slice(0, 40));
-ok('prompt lists the missions', prompt.includes('七聖召喚') && prompt.includes('深境螺旋'), 'missions');
-ok('prompt states the rules', prompt.includes('週10,000') && prompt.includes('シーズン任務は週上限の対象外'), 'rules');
-ok('prompt asks for a weekly plan', prompt.includes('週ごとの目安'), 'ask');
-ok('three destinations appear', $('#aiTargets').hidden === false && all('.ai-target').length === 3, String(all('.ai-target').length));
-ok('chatgpt link carries the prompt', ($('#aiChatgpt').getAttribute('href') || '').startsWith('https://chatgpt.com/?q='));
-ok('claude link carries the prompt', ($('#aiClaude').getAttribute('href') || '').startsWith('https://claude.ai/new?q='));
-ok('gemini link also carries the prompt', ($('#aiGemini').getAttribute('href') || '').startsWith('https://gemini.google.com/app?q='), ($('#aiGemini').getAttribute('href') || '').slice(0, 40));
-ok('prompt is kept for copying', $('#aiPrompt').value.length > 200, String($('#aiPrompt').value.length));
-
 console.log('\n# persistence');
 ok('state saved to localStorage', !!window.localStorage.getItem('genshin-bp-planner-v4'));
 
