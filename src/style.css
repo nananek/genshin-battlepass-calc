@@ -168,8 +168,6 @@
   .text-input { background: #fff; border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 6px 9px; }
   .text-input:focus-visible, .num:focus-visible, select:focus-visible { outline: 2px solid #dbe7ff; border-color: var(--blue); }
   select { background: #fff; border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 6px 8px; max-width: 200px; }
-  .tier-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0 3px; border-top: 1px solid var(--line-soft); margin-top: 10px; }
-  .tier-row label { color: var(--muted); font-size: 14px; }
   .check { display: flex; align-items: flex-start; gap: 8px; color: var(--muted); font-size: 14px; cursor: pointer; padding: 7px 0; }
   .check input { margin-top: 5px; accent-color: var(--blue); }
 

@@ -44,8 +44,7 @@ const base = {
   weekEarned: 0,
   todayDone: false,
   ar: 60,
-  tier: 'earth',
-  pearlNotBought: false,
+  pearlBought: false,
   seasonEnd: data.season.end,
   nowOverride: NOW,
   weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'plan', future: true }])),
@@ -116,10 +115,8 @@ eq('ar28 week max', compute({ ...base, ar: 28 }).weeklyFull, 10000);
 ok('ar20 raw weekly below cap', compute({ ...base, ar: 20 }).weeks[1].rawDaily + compute({ ...base, ar: 20 }).weeks[1].rawWeekly < 10000);
 
 section('pearl');
-const pearl = compute({ ...base, tier: 'shinju', pearlNotBought: true });
-eq('unbought pearl adds 10000', pearl.total - d0.total, 10000);
-eq('bought pearl adds nothing', compute({ ...base, tier: 'shinju', pearlNotBought: false }).total, d0.total);
-eq('pearl ignored for other tiers', compute({ ...base, tier: 'sky', pearlNotBought: true }).total, d0.total);
+eq('bought pearl adds 10000', compute({ ...base, pearlBought: true }).total - d0.total, 10000);
+eq('not buying is the default', compute(base).total, d0.total);
 
 section('target and purchase');
 const short = compute({ ...base, level: 1, exp: 0, target: 50, nowOverride: '2026-12-10T12:00' });

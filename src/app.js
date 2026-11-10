@@ -7,7 +7,7 @@
   const WEEK_CAP = 10000;
   const LEVEL_EXP = 1000;
   const MAX_LEVEL = 50;
-  const STORE_KEY = 'genshin-bp-planner-v3';
+  const STORE_KEY = 'genshin-bp-planner-v4';
 
   const DATA = window.__BP_DATA__;
   const SEASON_META = DATA.season;
@@ -27,8 +27,7 @@
     weekEarned: 0,
     todayDone: false,
     ar: 60,
-    tier: 'earth',
-    pearlNotBought: false,
+    pearlBought: false,
     seasonEnd: SEASON_META.end,
     nowOverride: '',
     weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'plan', future: true }])),
@@ -98,8 +97,8 @@
     if (!Number.isFinite(endMs)) endMs = parseJst(DEFAULT_STATE.seasonEnd);
 
     const targetTotal = (state.target - 1) * LEVEL_EXP;
-    // 真珠の歌のLv+10は購入した瞬間に入る。買った後は入力したLvに含まれているので足さない。
-    const pearlBonus = state.tier === 'shinju' && state.pearlNotBought ? 10000 : 0;
+    // 買わないのが既定。買った場合のLv+10は即時適用なので、未反映のぶんだけ足す。
+    const pearlBonus = state.pearlBought ? 10000 : 0;
     let total = (state.level - 1) * LEVEL_EXP + state.exp + pearlBonus;
 
     const missions = missionsOf(state);
@@ -300,7 +299,6 @@
     renderWeekly(d);
     renderSeason(d);
     renderChart(d);
-    $('#pearlRow').hidden = state.tier !== 'shinju';
   }
 
   function renderCountdown(d) {
@@ -471,11 +469,11 @@
   }
 
   function bindInputs() {
-    for (const key of ['target', 'level', 'exp', 'weekEarned', 'ar', 'tier', 'seasonEnd', 'nowOverride']) {
+    for (const key of ['target', 'level', 'exp', 'weekEarned', 'ar', 'seasonEnd', 'nowOverride']) {
       const el = document.querySelectorAll(`[data-bind="${key}"]`);
       el.forEach(n => { n.value = state[key]; });
     }
-    for (const key of ['todayDone', 'pearlNotBought']) {
+    for (const key of ['todayDone', 'pearlBought']) {
       document.querySelectorAll(`[data-bind="${key}"]`).forEach(n => { n.checked = !!state[key]; });
     }
   }
@@ -505,15 +503,6 @@
     }
     save();
     render();
-  });
-
-  document.addEventListener('change', (e) => {
-    const t = e.target;
-    if (t.tagName === 'SELECT' && t.dataset.bind === 'tier') {
-      state.tier = t.value;
-      save();
-      render();
-    }
   });
 
   document.addEventListener('input', (e) => {

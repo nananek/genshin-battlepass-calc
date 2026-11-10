@@ -67,7 +67,7 @@ ok('labels use game wording',
   document.body.textContent.includes('紀行経験') &&
   document.body.textContent.includes('今週の獲得経験値'));
 ok('today done is on the main card', !!document.querySelector('.panel-body [data-bind="todayDone"]'));
-ok('purchase plan is on the main card', $('#tier') && $('#tier').closest('details') === null, $('#tier') ? String($('#tier').closest('details')) : 'missing');
+ok('no plan dropdown', $('#tier') === null);
 ok('pearl checkbox is on the main card', $('#pearlRow').closest('details') === null);
 ok('no step navigation', all('[data-nav]').length === 0);
 ok('no per-field description text', all('.desc').length === 0);
@@ -186,17 +186,12 @@ setInput('#target', '30');
 ok('target change rewrites the hero', text('#resultPanel').includes('/ 30'), text('#resultPanel').slice(0, 40));
 setInput('#target', '50');
 
-const tier = $('#tier');
-tier.value = 'shinju';
-fire(tier, 'change');
-ok('pearl checkbox appears for 真珠の歌', $('#pearlRow').hidden === false);
 const beforePearl = heroLevel();
-toggle('[data-bind="pearlNotBought"]', true);
-ok('unbought 真珠の歌 adds the Lv+10', heroLevel() > beforePearl, `${beforePearl} -> ${heroLevel()}`);
-toggle('[data-bind="pearlNotBought"]', false);
-tier.value = 'earth';
-fire(tier, 'change');
-ok('pearl checkbox hides again', $('#pearlRow').hidden === true);
+ok('not buying is the default', !document.querySelector('[data-bind="pearlBought"]').checked);
+toggle('[data-bind="pearlBought"]', true);
+ok('bought 真珠の歌 adds the Lv+10', heroLevel() > beforePearl, `${beforePearl} -> ${heroLevel()}`);
+toggle('[data-bind="pearlBought"]', false);
+ok('unchecking removes it', heroLevel() === beforePearl, String(heroLevel()));
 
 console.log('\n# today');
 const dailyBefore = /デイリー ([\d,]+)/.exec(budget()[0])?.[1];
@@ -207,7 +202,7 @@ toggle('[data-bind="todayDone"]', false);
 ok('unchecking restores it', /デイリー ([\d,]+)/.exec(budget()[0])?.[1] === dailyBefore, budget()[0]);
 
 console.log('\n# persistence');
-ok('state saved to localStorage', !!window.localStorage.getItem('genshin-bp-planner-v3'));
+ok('state saved to localStorage', !!window.localStorage.getItem('genshin-bp-planner-v4'));
 
 window.close();
 
