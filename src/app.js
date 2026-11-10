@@ -20,20 +20,39 @@
   const DAILY_EXP = DAILY.reduce((s, m) => s + m.exp, 0);
 
   // 問診票の既定。買わない・やらない側に倒しておく。
+  // 問診票。上から順に1問ずつ聞く。
   const ANSWERS = [
-    { key: 'events', label: 'イベント任務をやる', group: 'season', def: true },
-    { key: 'artifacts', label: '聖遺物を強化する', group: 'season', def: true },
-    { key: 'abyss', label: '深境螺旋をやる', group: 'season', def: false },
-    { key: 'theater', label: '幻想シアターをやる', group: 'season', def: false },
-    { key: 'stygian', label: '幽境の激戦をやる', group: 'season', def: false },
-    { key: 'pull', label: '今週だけモラをたくさん使う', group: 'weekly', def: false },
-    { key: 'tcg', label: '七聖召喚をやる', group: 'weekly', def: false },
-    { key: 'farm', label: '秘境・ボス・地脈を周回する', group: 'weekly', def: false },
-    { key: 'cook', label: '料理を作る', group: 'weekly', def: true },
-    { key: 'forge', label: '鍛造を頼む', group: 'weekly', def: false },
-    { key: 'friendpot', label: '他人の壺で買い物をする', group: 'weekly', def: false },
-    { key: 'furniture', label: '調度品を作る', group: 'weekly', def: false },
+    { key: 'events', q: 'イベント任務、やっちゃう?', art: 'flag', def: true },
+    { key: 'abyss', q: '深境螺旋は?', art: 'spiral', def: false },
+    { key: 'theater', q: '幻想シアターは?', art: 'curtain', def: false },
+    { key: 'stygian', q: '幽境の激戦は?', art: 'swords', def: false },
+    { key: 'artifacts', q: '聖遺物、強化する?', art: 'flower', def: true },
+    { key: 'pull', q: '今週だけモラをたくさん使う?', art: 'coin', def: false },
+    { key: 'tcg', q: '七聖召喚は?', art: 'cards', def: false },
+    { key: 'farm', q: '秘境・ボス・地脈を回る?', art: 'loop', def: false },
+    { key: 'cook', q: '料理は作る?', art: 'pot', def: true },
+    { key: 'forge', q: '鍛造は頼む?', art: 'anvil', def: false },
+    { key: 'friendpot', q: '他人の壺で買い物する?', art: 'teapot', def: false },
+    { key: 'furniture', q: '調度品は作る?', art: 'chair', def: false },
   ];
+  const ART = {
+    flag: '<path d="M20 54V12"/><path d="M20 15h24l-5 7 5 7H20z"/>',
+    spiral: '<path d="M32 34a7 7 0 1 1 7-7 14 14 0 1 1-14 14 21 21 0 1 1 21 21"/>',
+    curtain: '<path d="M12 14h40"/><path d="M20 14c0 9 3 13 3 20v16"/><path d="M44 14c0 9-3 13-3 20v16"/><path d="M12 50h40"/>',
+    swords: '<path d="M17 47l23-23"/><path d="M13 43l7 7"/><path d="M47 47L24 24"/><path d="M51 43l-7 7"/>',
+    flower: '<circle cx="32" cy="32" r="4.5"/><circle cx="32" cy="18" r="6.5"/><circle cx="45" cy="26" r="6.5"/><circle cx="40" cy="41" r="6.5"/><circle cx="24" cy="41" r="6.5"/><circle cx="19" cy="26" r="6.5"/>',
+    coin: '<circle cx="32" cy="32" r="18"/><circle cx="32" cy="32" r="9"/>',
+    cards: '<rect x="12" y="20" width="24" height="32" rx="4"/><rect x="28" y="14" width="24" height="32" rx="4"/>',
+    loop: '<path d="M48 32a16 16 0 1 1-5-12"/><path d="M48 13v8h-8"/>',
+    pot: '<path d="M14 30h36v8a12 12 0 0 1-12 12H26a12 12 0 0 1-12-12z"/><path d="M10 30h44"/><path d="M26 22c0-4 4-4 4-8"/><path d="M36 22c0-4 4-4 4-8"/>',
+    anvil: '<path d="M14 34h28c4 0 8-3 8-9"/><path d="M22 34v9h16v-9"/><path d="M18 50h24"/>',
+    teapot: '<path d="M18 30h20a8 8 0 0 1 0 16H18z"/><path d="M38 33h7a4 4 0 0 1 0 8h-7"/><path d="M22 30v-5h12v5"/>',
+    chair: '<path d="M22 12v22h20"/><path d="M22 34h20v16"/><path d="M27 34v10"/><path d="M20 50h4"/>',
+    check: '<path d="M14 34l12 12 24-26"/>',
+  };
+  const artSvg = (name, cls = 'quiz-art') =>
+    `<svg class="${cls}" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">${ART[name] || ''}</svg>`;
+
   const ANSWERS_DEFAULT = Object.fromEntries(ANSWERS.map(a => [a.key, a.def]));
 
   // 問診票の答えを任務の選択に反映する。表側はあとから手で直してよい。
@@ -393,30 +412,125 @@
       ${notes.length ? `<div class="notes">${notes.join('')}</div>` : ''}`;
   }
 
-  const QUIZ_PAGES = [
-    { title: 'シーズン任務', group: 'season' },
-    { title: 'ウィークリー', group: 'weekly' },
-  ];
-  let quizPage = 0;
+  // バックエンドが無いので、状態をそのまま貼れる相談文にしてChatGPTへ渡す。
+  function buildPrompt() {
+    const d = compute(state);
+    const L = [];
+    const st = (w) => (w.thisWeek === 'done' ? '済' : w.thisWeek === 'plan' ? 'やる' : 'やらない');
+    const ss = (st2) => (st2 === 'done' ? '済' : st2 === 'plan' ? 'やる' : 'やらない');
+
+    L.push(`原神の紀行「${SEASON_META.name}」（${SEASON_META.startLabel}〜${SEASON_META.endLabel}）の消化計画を立ててください。`);
+    L.push('');
+    L.push(`いま: 紀行Lv ${state.level}（${state.exp} / 1,000）、今週の獲得経験値 ${state.weekEarned} / 10,000`);
+    L.push(`目標: Lv${state.target}（${num(d.targetTotal)} EXP）／残り${d.weeksLeft}週`);
+    L.push('');
+    L.push('ルール');
+    L.push('- 紀行経験1,000でLv+1。Lv50が上限');
+    L.push(`- デイリー4件で1日${num(d.dailyExp)} EXP（毎日やる前提）`);
+    L.push('- デイリーとウィークリーは週10,000 EXPまで。超えた分は加算されない（月曜05:00リセット）');
+    L.push('- シーズン任務は週上限の対象外');
+    L.push('- Lv購入はしない');
+    L.push('');
+    L.push('ウィークリー（週1回・上限に含む）');
+    for (const m of WEEKLY) {
+      const w = state.weekly[m.id] || { thisWeek: 'none', future: false };
+      L.push(`- ${m.name} ${m.exp} EXP（AR${m.ar}以上）… 今週: ${st(w)} / 来週以降: ${w.future ? '毎週やる' : 'やらない'}`);
+    }
+    L.push('');
+    L.push('シーズン任務（上限の外）');
+    for (const m of d.missions) {
+      L.push(`- ${m.name} ${m.exp} EXP（期限 ${fmtDate(m.deadlineMs)}）… ${ss(m.status)}`);
+    }
+    L.push('');
+    L.push('お願い');
+    L.push('1. 週10,000を超えない範囲で、やらなくてよいウィークリーを選んでください。労力が小さいほど助かります');
+    L.push('2. シーズン任務の やる／やらない を決めてください');
+    L.push('3. 着地点のLvと、目標までの不足または余りを出してください');
+    L.push('4. 週ごとの目安を短い表にしてください');
+    return L.join('\n');
+  }
+
+  function askChatGpt() {
+    const prompt = buildPrompt();
+    const box = $('#aiPrompt');
+    if (box) box.value = prompt;
+    const preview = $('#aiPromptPreview');
+    if (preview) preview.textContent = prompt;
+
+    let copied = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(prompt).catch(() => {});
+        copied = true;
+      } else if (box) {
+        box.select();
+        copied = !!(document.execCommand && document.execCommand('copy'));
+      }
+    } catch (_) { copied = false; }
+
+    const enc = encodeURIComponent(prompt);
+    const targets = [
+      ['#aiChatgpt', 'https://chatgpt.com/?q=' + enc],
+      ['#aiClaude', 'https://claude.ai/new?q=' + enc],
+      ['#aiGemini', 'https://gemini.google.com/app'], // GeminiはURLで文面を渡せないのでコピーを使う
+    ];
+    for (const [sel, href] of targets) {
+      const a = $(sel);
+      if (a) a.href = href;
+    }
+    const box2 = $('#aiTargets');
+    if (box2) box2.hidden = false;
+
+    const state2 = $('#aiState');
+    if (state2) {
+      state2.textContent = copied ? 'コピーした。送り先をえらぶ' : '文面を出した';
+      clearTimeout(askChatGpt._t);
+      askChatGpt._t = setTimeout(() => { state2.textContent = ''; }, 4000);
+    }
+  }
+
+  let quizStep = 0;
 
   function renderQuiz() {
-    const a = state.answers;
-    const page = QUIZ_PAGES[quizPage];
-    const row = (q) => `<div class="quiz-row">
-        <span>${q.label}</span>
-        <div class="seg">
-          <button type="button" data-a="${q.key}" data-v="yes" class="${a[q.key] ? 'on done' : ''}">はい</button>
-          <button type="button" data-a="${q.key}" data-v="no" class="${a[q.key] ? '' : 'on none'}">いいえ</button>
+    const total = ANSWERS.length;
+    if (quizStep >= total) {
+      const d = compute(state);
+      $('#quizBody').innerHTML = `
+        <div class="quiz-done">
+          ${artSvg('check')}
+          <p class="quiz-q">おつかれ。下の表に入れておいたよ</p>
+          <div class="quiz-summary">
+            <div><span>シーズン任務</span><b>${d.planned.length}件 ${num(d.plannedSeasonExp)} EXP</b></div>
+            <div><span>今週のウィークリー</span><b>${num(d.thisWeekPool)} EXP</b></div>
+            <div><span>着地点</span><b>Lv ${d.projectedLevel}</b></div>
+          </div>
+          <button type="button" class="quiz-btn yes on wide" data-quiz-close>とじる</button>
+        </div>`;
+      $('#quizStep').textContent = 'おわり';
+      $('[data-quiz-prev]').disabled = false;
+      const yes = ANSWERS.filter(q => state.answers[q.key]).length;
+      $('#quizCount').textContent = `はい ${yes} / ${total}`;
+      return;
+    }
+
+    const item = ANSWERS[quizStep];
+    const on = state.answers[item.key];
+    $('#quizBody').innerHTML = `
+      <div class="quiz-dots">
+        ${ANSWERS.map((q, i) => `<button type="button" class="quiz-dot${i === quizStep ? ' now' : ''}" data-quiz-jump="${i}" aria-label="${i + 1}問目"></button>`).join('')}
+      </div>
+      <div class="quiz-card">
+        ${artSvg(item.art)}
+        <p class="quiz-q">${item.q}</p>
+        <div class="quiz-answers">
+          <button type="button" class="quiz-btn yes${on ? ' on' : ''}" data-a="${item.key}" data-v="yes">やる</button>
+          <button type="button" class="quiz-btn no${on ? '' : ' on'}" data-a="${item.key}" data-v="no">やらない</button>
         </div>
       </div>`;
-    const qs = ANSWERS.filter(q => q.group === page.group);
-    $('#quizBody').innerHTML = `<div class="quiz-group"><h3>${page.title}</h3>${qs.map(row).join('')}</div>`;
-    $('#quizStep').textContent = `${quizPage + 1} / ${QUIZ_PAGES.length}`;
-    $('[data-quiz-prev]').disabled = quizPage === 0;
-    $('[data-quiz-next]').textContent = quizPage === QUIZ_PAGES.length - 1 ? '完了' : '次へ';
-
-    const yes = ANSWERS.filter(q => a[q.key]).length;
-    $('#quizCount').textContent = `はい ${yes} / ${ANSWERS.length}`;
+    $('#quizStep').textContent = `${quizStep + 1} / ${total}`;
+    $('[data-quiz-prev]').disabled = quizStep === 0;
+    const yes = ANSWERS.filter(q => state.answers[q.key]).length;
+    $('#quizCount').textContent = `はい ${yes} / ${total}`;
   }
 
   function renderWeekly(d) {
@@ -586,7 +700,7 @@
   });
 
   function openQuiz() {
-    quizPage = 0;
+    quizStep = 0;
     renderQuiz();
     $('#quizModal').hidden = false;
     document.body.classList.add('modal-open');
@@ -606,17 +720,17 @@
 
   document.addEventListener('click', (e) => {
     if (e.target.closest('[data-quiz-open]')) { openQuiz(); return; }
+    if (e.target.closest('[data-ai-ask]')) { askChatGpt(); return; }
     if (e.target.closest('[data-quiz-close]')) { closeQuiz(); return; }
-    if (e.target.closest('[data-quiz-prev]')) { quizPage = Math.max(0, quizPage - 1); renderQuiz(); return; }
-    if (e.target.closest('[data-quiz-next]')) {
-      if (quizPage < QUIZ_PAGES.length - 1) { quizPage += 1; renderQuiz(); } else { closeQuiz(); }
-      return;
-    }
+    if (e.target.closest('[data-quiz-prev]')) { quizStep = Math.max(0, quizStep - 1); render(); return; }
+    const jump = e.target.closest('[data-quiz-jump]');
+    if (jump) { quizStep = Number(jump.dataset.quizJump); render(); return; }
     const ans = e.target.closest('button[data-a]');
     if (ans) {
       state.answers[ans.dataset.a] = ans.dataset.v === 'yes';
       applyAnswers(state);
       save();
+      if (quizStep < ANSWERS.length) quizStep += 1; // 答えたら次へ
       render();
       return;
     }

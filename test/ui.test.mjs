@@ -46,24 +46,29 @@ const landingValue = (label) => {
   return k && k.nextElementSibling ? k.nextElementSibling.textContent.replace(/\s+/g, ' ').trim() : '';
 };
 const panelOrder = () => all('main .panel-head h2').map(el => el.textContent.trim());
+const visibleCopy = () => ['main', '.landing', '.modal'].map(sel => text(sel)).join(' ');
 const seg = (id, v) => document.querySelector(`button[data-s="${id}"][data-v="${v}"]`);
 const wseg = (id, v) => document.querySelector(`button[data-w="${id}"][data-v="${v}"]`);
 const futureBox = (id) => document.querySelector(`input[data-future="${id}"]`);
 const budget = () => all('#weeklyBudget .budget').map(p => p.textContent.replace(/\s+/g, ' ').trim());
-const SEASON_KEYS = ['events', 'artifacts', 'abyss', 'theater', 'stygian'];
-const WEEKLY_KEYS = ['pull', 'tcg', 'farm', 'cook', 'forge', 'friendpot', 'furniture'];
-const answerKeys = () => [...SEASON_KEYS, ...WEEKLY_KEYS];
-const stepNo = () => Number(/^(\d) \//.exec(text('#quizStep'))?.[1]);
-const goPage = (n) => {
-  for (let i = 0; i < 4 && stepNo() !== n; i += 1) {
-    document.querySelector(stepNo() < n ? '[data-quiz-next]' : '[data-quiz-prev]').click();
-  }
+// 問診票の質問順（1問ずつ聞く）
+const QKEYS = ['events', 'abyss', 'theater', 'stygian', 'artifacts', 'pull', 'tcg', 'farm', 'cook', 'forge', 'friendpot', 'furniture'];
+const answerKeys = () => [...QKEYS];
+const gotoQ = (key) => {
+  const i = QKEYS.indexOf(key);
+  const dots = all('.quiz-dot');
+  if (!dots[i]) throw new Error(`quiz is not open: ${key}`);
+  dots[i].click();
 };
 const answer = (key, yes) => {
-  goPage(SEASON_KEYS.includes(key) ? 1 : 2);
+  gotoQ(key);
   document.querySelector(`button[data-a="${key}"][data-v="${yes ? 'yes' : 'no'}"]`).click();
 };
 const answerAll = (yes) => { for (const k of answerKeys()) answer(k, yes); };
+const quizOn = (key) => {
+  gotoQ(key);
+  return document.querySelector(`button[data-a="${key}"][data-v="yes"]`).classList.contains('on');
+};
 const seasonRows = () => all('#seasonRows tr');
 const rowId = (tr) => tr.querySelector('button[data-s]').dataset.s;
 
@@ -83,19 +88,21 @@ ok('labels use game wording',
   document.body.textContent.includes('今週の獲得経験値'));
 ok('today done is on the main card', !!document.querySelector('.panel-body [data-bind="todayDone"]'));
 ok('no plan dropdown', $('#tier') === null);
-ok('no purchase option at all', !document.body.textContent.includes('真珠の歌'));
+ok('no purchase option at all', !['main', '.landing', '.modal'].map(sel => text(sel)).join(' ').includes('真珠の歌'));
 ok('no step navigation', all('[data-nav]').length === 0);
 ok('no per-field description text', all('.desc').length === 0);
 ok('no slider duplicate', all('input[type="range"]').length === 0);
-ok('no level purchase', !document.body.textContent.includes('Lv購入'));
+ok('no level purchase', !['main', '.landing', '.modal'].map(sel => text(sel)).join(' ').includes('Lv購入'));
 
 console.log('\n# layout');
 ok('landing bar sits outside main', $('#resultPanel').closest('main') === null && $('#resultPanel').closest('.landing') !== null);
 ok('landing bar is labelled 計画着地点', text('#resultPanel').includes('計画着地点'), text('#resultPanel').slice(0, 30));
-ok('quiz comes before the mission tables', (() => {
-  const o = panelOrder();
-  return o.indexOf('問診票') >= 0 && o.indexOf('問診票') < o.indexOf('シーズン任務');
+ok('the CTA comes before the mission tables', (() => {
+  const cta = $('#quizOpen').closest('section');
+  const season = $('#seasonRows').closest('section');
+  return cta.compareDocumentPosition(season) & window.Node.DOCUMENT_POSITION_FOLLOWING;
 })(), panelOrder().join(' / '));
+ok('the CTA is worded as an action', text('#quizOpen').includes('質問に答えて消化計画を立てる'), text('#quizOpen'));
 ok('season comes before weekly', (() => {
   const o = panelOrder();
   return o.indexOf('シーズン任務') >= 0 && o.indexOf('シーズン任務') < o.indexOf('ウィークリー');
@@ -103,33 +110,38 @@ ok('season comes before weekly', (() => {
 
 console.log('\n# quiz');
 ok('quiz is closed at first', $('#quizModal').hidden === true);
+ok('no 問診票 wording in the UI', !visibleCopy().includes('問診票'), visibleCopy().includes('問診票') ? 'found' : 'none');
 $('#quizOpen').click();
 ok('button opens the questionnaire', $('#quizModal').hidden === false);
-ok('first page has the season questions', all('button[data-a]').length === 10 && stepNo() === 1, `${all('button[data-a]').length} buttons / step ${stepNo()}`);
-ok('first page is シーズン任務', text('#quizBody').includes('聖遺物') && !text('#quizBody').includes('七聖召喚'), text('#quizBody').slice(0, 30));
-ok('prev is disabled on the first page', document.querySelector('[data-quiz-prev]').disabled === true);
-document.querySelector('[data-quiz-next]').click();
-ok('second page holds the weekly questions', stepNo() === 2 && all('button[data-a]').length === 14, `step ${stepNo()} / ${all('button[data-a]').length} buttons`);
-ok('second page is ウィークリー', text('#quizBody').includes('七聖召喚'), text('#quizBody').slice(0, 30));
-ok('next becomes 完了 on the last page', text('[data-quiz-next]') === '完了', text('[data-quiz-next]'));
+ok('one question at a time', all('button[data-a]').length === 2, String(all('button[data-a]').length));
+ok('question has an illustration', all('#quizBody svg.quiz-art').length === 1);
+ok('step shows 1 / 12', text('#quizStep') === '1 / 12', text('#quizStep'));
+ok('first question is the event one', text('#quizBody').includes('イベント任務'), text('#quizBody').slice(0, 40));
+ok('twelve progress dots', all('.quiz-dot').length === 12, String(all('.quiz-dot').length));
+ok('prev is disabled on the first question', document.querySelector('[data-quiz-prev]').disabled === true);
+
+document.querySelector('button[data-a="events"][data-v="yes"]').click();
+ok('answering advances to the next question', text('#quizStep') === '2 / 12' && text('#quizBody').includes('深境螺旋'), `${text('#quizStep')} ${text('#quizBody').slice(0, 20)}`);
 document.querySelector('[data-quiz-prev]').click();
-ok('prev returns to the first page', stepNo() === 1, String(stepNo()));
+ok('prev returns to the previous question', text('#quizStep') === '1 / 12', text('#quizStep'));
+all('.quiz-dot')[4].click();
+ok('dots jump to a question', text('#quizStep') === '5 / 12' && text('#quizBody').includes('聖遺物'), text('#quizStep'));
 ok('count is shown on the button', /はい \d+ \/ 12/.test(text('#quizCount')), text('#quizCount'));
-const quizOn = (key) => {
-  goPage(SEASON_KEYS.includes(key) ? 1 : 2);
-  return document.querySelector(`button[data-a="${key}"][data-v="yes"]`).classList.contains('on');
-};
 ok('events default to yes', quizOn('events'));
 ok('artifacts default to yes', quizOn('artifacts'));
 ok('cooking defaults to yes', quizOn('cook'));
 ok('hard content defaults to no', !quizOn('abyss') && !quizOn('theater') && !quizOn('stygian'));
 ok('七聖召喚 defaults to no', !quizOn('tcg'));
-goPage(2);
-ok('モラの質問は行動で書く', text('#quizBody').includes('今週だけモラをたくさん使う'), text('#quizBody').slice(0, 40));
-document.querySelector('[data-quiz-close]').click();
-ok('close button hides the questionnaire', $('#quizModal').hidden === true);
+gotoQ('pull');
+ok('モラの質問は行動で書く', text('#quizBody').includes('今週だけモラをたくさん使う'), text('#quizBody').slice(0, 30));
+
+answer('furniture', false);
+ok('answering the last question shows the summary', text('#quizStep') === 'おわり' && text('#quizBody').includes('おつかれ'), text('#quizBody').slice(0, 30));
+ok('summary lists the result', text('#quizBody').includes('シーズン任務') && /Lv \d+/.test(text('#quizBody')), text('#quizBody').slice(0, 60));
+document.querySelector('.modal-foot [data-quiz-close]').click();
+ok('closing hides the questionnaire', $('#quizModal').hidden === true);
 $('#quizOpen').click();
-ok('reopening starts at the first page', stepNo() === 1, String(stepNo()));
+ok('reopening starts at the first question', text('#quizStep') === '1 / 12', text('#quizStep'));
 
 console.log('\n# quiz fills the tables');
 setInput('#nowOverride', '2026-12-10T12:00');
@@ -189,7 +201,7 @@ seg(expiredId, 'none').click();
 
 console.log('\n# weekly table');
 setInput('#nowOverride', '2026-11-10T19:27');
-answerAll(true);
+$('#quizOpen').click();
 answerAll(true);
 ok('two budget lines', budget().length === 2, JSON.stringify(budget()));
 ok('all twelve weeklies listed', all('#weeklyRows tr').length === 12, String(all('#weeklyRows tr').length));
@@ -246,6 +258,20 @@ const dailyAfter = /デイリー ([\d,]+)/.exec(budget()[0])?.[1];
 ok('today done removes a day from the week', dailyBefore !== dailyAfter && Number(dailyAfter.replace(/,/g, '')) < Number(dailyBefore.replace(/,/g, '')), `${dailyBefore} -> ${dailyAfter}`);
 toggle('[data-bind="todayDone"]', false);
 ok('unchecking restores it', /デイリー ([\d,]+)/.exec(budget()[0])?.[1] === dailyBefore, budget()[0]);
+
+console.log('\n# ai hand-off');
+ok('destinations are hidden before asking', $('#aiTargets').hidden === true);
+$('#aiAsk').click();
+const prompt = text('#aiPromptPreview');
+ok('prompt shows the current numbers', prompt.includes('紀行Lv') && prompt.includes('今週の獲得経験値'), prompt.slice(0, 40));
+ok('prompt lists the missions', prompt.includes('七聖召喚') && prompt.includes('深境螺旋'), 'missions');
+ok('prompt states the rules', prompt.includes('週10,000') && prompt.includes('シーズン任務は週上限の対象外'), 'rules');
+ok('prompt asks for a weekly plan', prompt.includes('週ごとの目安'), 'ask');
+ok('three destinations appear', $('#aiTargets').hidden === false && all('.ai-target').length === 3, String(all('.ai-target').length));
+ok('chatgpt link carries the prompt', ($('#aiChatgpt').getAttribute('href') || '').startsWith('https://chatgpt.com/?q='));
+ok('claude link carries the prompt', ($('#aiClaude').getAttribute('href') || '').startsWith('https://claude.ai/new?q='));
+ok('gemini link opens the app', ($('#aiGemini').getAttribute('href') || '').startsWith('https://gemini.google.com/app'));
+ok('prompt is kept for copying', $('#aiPrompt').value.length > 200, String($('#aiPrompt').value.length));
 
 console.log('\n# persistence');
 ok('state saved to localStorage', !!window.localStorage.getItem('genshin-bp-planner-v4'));
