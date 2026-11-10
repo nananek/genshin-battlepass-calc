@@ -68,7 +68,7 @@ ok('labels use game wording',
   document.body.textContent.includes('今週の獲得経験値'));
 ok('today done is on the main card', !!document.querySelector('.panel-body [data-bind="todayDone"]'));
 ok('no plan dropdown', $('#tier') === null);
-ok('pearl checkbox is on the main card', $('#pearlRow').closest('details') === null);
+ok('no purchase option at all', !document.body.textContent.includes('真珠の歌'));
 ok('no step navigation', all('[data-nav]').length === 0);
 ok('no per-field description text', all('.desc').length === 0);
 ok('no slider duplicate', all('input[type="range"]').length === 0);
@@ -185,13 +185,6 @@ console.log('\n# settings');
 setInput('#target', '30');
 ok('target change rewrites the hero', text('#resultPanel').includes('/ 30'), text('#resultPanel').slice(0, 40));
 setInput('#target', '50');
-
-const beforePearl = heroLevel();
-ok('not buying is the default', !document.querySelector('[data-bind="pearlBought"]').checked);
-toggle('[data-bind="pearlBought"]', true);
-ok('bought 真珠の歌 adds the Lv+10', heroLevel() > beforePearl, `${beforePearl} -> ${heroLevel()}`);
-toggle('[data-bind="pearlBought"]', false);
-ok('unchecking removes it', heroLevel() === beforePearl, String(heroLevel()));
 
 console.log('\n# today');
 const dailyBefore = /デイリー ([\d,]+)/.exec(budget()[0])?.[1];

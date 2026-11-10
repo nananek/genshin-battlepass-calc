@@ -27,7 +27,6 @@
     weekEarned: 0,
     todayDone: false,
     ar: 60,
-    pearlBought: false,
     seasonEnd: SEASON_META.end,
     nowOverride: '',
     weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'plan', future: true }])),
@@ -97,9 +96,8 @@
     if (!Number.isFinite(endMs)) endMs = parseJst(DEFAULT_STATE.seasonEnd);
 
     const targetTotal = (state.target - 1) * LEVEL_EXP;
-    // 買わないのが既定。買った場合のLv+10は即時適用なので、未反映のぶんだけ足す。
-    const pearlBonus = state.pearlBought ? 10000 : 0;
-    let total = (state.level - 1) * LEVEL_EXP + state.exp + pearlBonus;
+    // 現在のLvを申告してもらうので、購入プランは計算に入れない。
+    let total = (state.level - 1) * LEVEL_EXP + state.exp;
 
     const missions = missionsOf(state);
     const planned = [];
@@ -177,7 +175,7 @@
     const plannedSeasonExp = planned.reduce((s, m) => s + m.exp, 0);
     const projectedLevel = Math.min(MAX_LEVEL, Math.floor(total / LEVEL_EXP) + 1);
     const deficit = Math.max(0, targetTotal - total);
-    const startTotal = (state.level - 1) * LEVEL_EXP + state.exp + pearlBonus;
+    const startTotal = (state.level - 1) * LEVEL_EXP + state.exp;
     const needNow = Math.max(0, targetTotal - startTotal);
     const weeksLeft = weeks.length;
     const needPerWeek = weeksLeft ? Math.ceil(needNow / weeksLeft) : needNow;
@@ -191,7 +189,7 @@
     const thisWeekNeed = Math.max(0, weekRoom - (current ? current.rawDaily : 0));
 
     return {
-      nowMs, endMs, targetTotal, pearlBonus, arMax, weeklyNeeded, dailyExp: DAILY_EXP,
+      nowMs, endMs, targetTotal, arMax, weeklyNeeded, dailyExp: DAILY_EXP,
       thisWeekPool, nextWeekPool, doneThisWeek, weekRoom, thisWeekNeed,
       thisWeekBudget: thisWeekPool - thisWeekNeed,
       nextWeekBudget: nextWeekPool - weeklyNeeded,
@@ -431,7 +429,7 @@
     const L = 58, R = 24, T = 30, B = 30;
     const rawMax = Math.max((MAX_LEVEL - 1) * LEVEL_EXP, d.total, d.targetTotal);
     const maxExp = Math.ceil(rawMax / 10000) * 10000;
-    const startTotal = (state.level - 1) * LEVEL_EXP + state.exp + d.pearlBonus;
+    const startTotal = (state.level - 1) * LEVEL_EXP + state.exp;
     const pts = [{ at: null, total: startTotal, level: Math.min(MAX_LEVEL, Math.floor(startTotal / LEVEL_EXP) + 1) }]
       .concat(d.weeks.map(w => ({ at: w.ws + 6 * DAY, total: w.total, level: w.level })));
 
@@ -473,7 +471,7 @@
       const el = document.querySelectorAll(`[data-bind="${key}"]`);
       el.forEach(n => { n.value = state[key]; });
     }
-    for (const key of ['todayDone', 'pearlBought']) {
+    for (const key of ['todayDone']) {
       document.querySelectorAll(`[data-bind="${key}"]`).forEach(n => { n.checked = !!state[key]; });
     }
   }

@@ -44,7 +44,6 @@ const base = {
   weekEarned: 0,
   todayDone: false,
   ar: 60,
-  pearlBought: false,
   seasonEnd: data.season.end,
   nowOverride: NOW,
   weekly: Object.fromEntries(WEEKLY.map(m => [m.id, { thisWeek: 'plan', future: true }])),
@@ -113,10 +112,6 @@ for (const ar of [20, 28, 32, 60]) {
 eq('ar20 week max', compute({ ...base, ar: 20 }).weeklyFull, dailyTotal * 7 + 4545);
 eq('ar28 week max', compute({ ...base, ar: 28 }).weeklyFull, 10000);
 ok('ar20 raw weekly below cap', compute({ ...base, ar: 20 }).weeks[1].rawDaily + compute({ ...base, ar: 20 }).weeks[1].rawWeekly < 10000);
-
-section('pearl');
-eq('bought pearl adds 10000', compute({ ...base, pearlBought: true }).total - d0.total, 10000);
-eq('not buying is the default', compute(base).total, d0.total);
 
 section('target and purchase');
 const short = compute({ ...base, level: 1, exp: 0, target: 50, nowOverride: '2026-12-10T12:00' });
