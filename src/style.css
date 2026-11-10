@@ -128,7 +128,8 @@
   .chk { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 13px; cursor: pointer; white-space: nowrap; }
   .chk input { accent-color: var(--red); margin: 0; }
   .chk input:disabled { cursor: default; }
-  .budget { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+  .goal-line { margin: 0 0 10px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .budget { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
   .budget span { display: block; margin-top: 2px; font-size: 13px; font-weight: 400; color: var(--muted); }
   .budget.ok { color: var(--green); }
   .budget.gold { color: var(--gold); }

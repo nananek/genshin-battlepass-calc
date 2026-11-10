@@ -177,9 +177,15 @@
     const plannedSeasonExp = planned.reduce((s, m) => s + m.exp, 0);
     const projectedLevel = Math.min(MAX_LEVEL, Math.floor(total / LEVEL_EXP) + 1);
     const deficit = Math.max(0, targetTotal - total);
+    const startTotal = (state.level - 1) * LEVEL_EXP + state.exp + pearlBonus;
+    const needNow = Math.max(0, targetTotal - startTotal);
+    const weeksLeft = weeks.length;
+    const needPerWeek = weeksLeft ? Math.ceil(needNow / weeksLeft) : needNow;
+    const surplus = Math.max(0, total - targetTotal);
 
     const weeklyFull = Math.min(WEEK_CAP, DAILY_EXP * 7 + nextWeekPool);
     const weeklyNeeded = Math.max(0, WEEK_CAP - DAILY_EXP * 7);
+    const weeklyEarned7 = DAILY_EXP * 7;
     const current = weeks[0] || null;
     const weekRoom = current ? Math.max(0, WEEK_CAP - Math.min(WEEK_CAP, Math.max(0, state.weekEarned))) : 0;
     const thisWeekNeed = Math.max(0, weekRoom - (current ? current.rawDaily : 0));
@@ -192,7 +198,7 @@
       total, totalNoSeason: total - plannedSeasonExp, projectedLevel,
       weeks, reached, totalOverflow,
       missions, planned, plannedSeasonExp, expired,
-      deficit,
+      deficit, surplus, startTotal, needNow, needPerWeek, weeksLeft, weeklyEarned7,
       weeklyFull, weeklyShort: Math.max(0, WEEK_CAP - (DAILY_EXP * 7 + nextWeekPool)),
       currentWeek: weeks[0] || null,
     };
@@ -330,7 +336,7 @@
         <div class="sub">${reachedText}</div>
       </div>
       <div class="landing-side">
-        <div><span>目標まで</span><b class="${ok ? 'good' : 'bad'}">${ok ? '到達済み' : `${num(d.deficit)} EXP`}</b></div>
+        <div><span>${ok ? '余り' : '不足'}</span><b class="${ok ? 'good' : 'bad'}">${num(ok ? d.surplus : d.deficit)} EXP</b></div>
         <div><span>シーズン任務を除くと</span><b>Lv ${noSeasonLevel}</b></div>
       </div>
       ${notes.length ? `<div class="notes">${notes.join('')}</div>` : ''}`;
@@ -358,8 +364,8 @@
       </tr>`;
     }).join('');
 
-    const basisThis = `残り枠 ${num(d.weekRoom)} ／ 残りデイリー ${num(d.currentWeek ? d.currentWeek.rawDaily : 0)} ／ 今週やる ${num(d.thisWeekPool)}`;
-    const basisNext = `必要 ${num(d.weeklyNeeded)} ／ 毎週残す ${num(d.nextWeekPool)} ／ 全部 ${num(d.arMax)}`;
+    const basisThis = `今週の残り: デイリー ${num(d.currentWeek ? d.currentWeek.rawDaily : 0)} ／ ウィークリー ${num(d.thisWeekPool)}`;
+    const basisNext = `1週あたり: デイリー ${num(d.weeklyEarned7)} ／ ウィークリー ${num(d.nextWeekPool)}`;
 
     const skipText = (label, budget) =>
       !Number.isFinite(budget)
@@ -368,9 +374,13 @@
           ? `${label}は あと <b>${num(budget)}</b> EXP まで抜ける`
           : `${label}は1件も抜けない`;
 
-    const thisHtml = `<p class="budget ${Number.isFinite(d.goalBudgetThis) && d.goalBudgetThis === 0 ? 'gold' : 'ok'}">${skipText('今週', d.goalBudgetThis)}<span>${basisThis}</span></p>`;
-    let nextHtml;
-    if (d.goalBudget === null) {
+    const goal = `<p class="goal-line">目標まで ${num(d.needNow)} EXP ／ 残り${d.weeksLeft}週 ／ 1週あたり ${num(d.needPerWeek)} EXP 必要</p>`;
+
+    const thisHtml = goal + `<p class="budget ${Number.isFinite(d.goalBudgetThis) && d.goalBudgetThis === 0 ? 'gold' : 'ok'}">${skipText('今週', d.goalBudgetThis)}<span>${basisThis}</span></p>`;
+    let nextHtml = '';
+    if (d.weeksLeft <= 1) {
+      nextHtml = ''; // 残りが今週だけなら来週以降の話は出さない
+    } else if (d.goalBudget === null) {
       nextHtml = `<p class="budget bad">目標まで <b>${num(d.deficit)}</b> EXP 足りない<span>${basisNext}</span></p>`;
     } else {
       nextHtml = `<p class="budget ${Number.isFinite(d.goalBudget) && d.goalBudget === 0 ? 'gold' : 'ok'}">${skipText('来週以降', d.goalBudget)}<span>${basisNext}</span></p>`;
